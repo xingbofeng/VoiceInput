@@ -1,0 +1,15 @@
+.DS_Store
+.build/
+.swiftpm/
+dist/
+*.xcuserstate
+*.xccheckout
+xcuserdata/
+.env
+.env.*
+!.env.example
+implementation-notes.md
+
+.playwright-mcp/
+voiceinput-landing-page.png
+voiceinput-landing-en.png

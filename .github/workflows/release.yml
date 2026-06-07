@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: macos-14
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build release DMG
+        run: make dmg
+
+      - name: Verify release assets
+        run: |
+          codesign --verify --deep --strict .build/VoiceInputApp.app
+          lipo .build/VoiceInputApp.app/Contents/MacOS/VoiceInputApp -verify_arch arm64 x86_64
+          shasum -a 256 -c dist/VoiceInput-1.0.0-macOS.dmg.sha256
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: VoiceInput 1.0.0
+          body_path: .github/release-notes/v1.0.0.md
+          files: |
+            dist/VoiceInput-1.0.0-macOS.dmg
+            dist/VoiceInput-1.0.0-macOS.dmg.sha256
+          fail_on_unmatched_files: true

@@ -1,0 +1,21 @@
+import AppKit
+import XCTest
+@testable import VoiceInputApp
+
+final class OverlayLayoutTests: XCTestCase {
+    func testCapsuleUsesRequiredHeightAndRadius() {
+        XCTAssertEqual(OverlayLayout.capsuleHeight, 56)
+        XCTAssertEqual(OverlayLayout.cornerRadius, 28)
+    }
+
+    func testTextWidthIsClampedToRequiredRange() {
+        XCTAssertEqual(OverlayLayout.clampedTextWidth(40), 160)
+        XCTAssertEqual(OverlayLayout.clampedTextWidth(320), 320)
+        XCTAssertEqual(OverlayLayout.clampedTextWidth(900), 560)
+    }
+
+    func testWindowWidthIncludesWaveformSpacingAndPadding() {
+        XCTAssertEqual(OverlayLayout.windowWidth(textWidth: 160), 248)
+        XCTAssertEqual(OverlayLayout.windowWidth(textWidth: 560), 648)
+    }
+}
