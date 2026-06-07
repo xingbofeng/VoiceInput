@@ -1,0 +1,194 @@
+<div align="center">
+  <img src="docs/assets/voiceinput-logo.png" alt="VoiceInput logo" width="128">
+
+  <img src="docs/assets/voiceinput-hero.svg" alt="VoiceInput - Hold. Speak. Done." width="100%">
+
+  <h1>VoiceInput</h1>
+  <p><strong>按住快捷键，说完松开，文字就出现在光标所在的位置。</strong></p>
+  <p>一款为 macOS 设计的轻量语音输入工具，让想法、笔记、代码说明和 AI 对话更快落成文字。</p>
+  <p><sub><a href="README_EN.md">English</a></sub></p>
+
+  <p>
+    <img src="https://img.shields.io/badge/macOS-14%2B-111827?style=flat-square&logo=apple&logoColor=white" alt="macOS 14+">
+    <a href="https://github.com/xingbofeng/VoiceInput/releases/latest"><img src="https://img.shields.io/github/v/release/xingbofeng/VoiceInput?style=flat-square&label=release" alt="Latest release"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-open%20source-10B981?style=flat-square" alt="License"></a>
+  </p>
+  <p>
+    🌐 <a href="https://xingbofeng.github.io/VoiceInput/">官方网站</a>
+    &nbsp;·&nbsp;
+    ⬇️ <a href="https://github.com/xingbofeng/VoiceInput/releases/latest">下载最新版</a>
+    &nbsp;·&nbsp;
+    🎬 <a href="docs/voiceinput-demo-land.mp4">介绍视频</a>
+  </p>
+</div>
+
+## VoiceInput 是什么
+
+VoiceInput 是一个“语音键盘”，不是语音助手。
+
+它不会接管你的窗口，也不会要求你把内容搬到另一个输入框里。你只需要把光标放在想输入的位置，按下快捷键开始说话，松开后文字会直接落到原来的地方。写代码、和 AI Agent 对话、记会议想法、回复消息、整理长段说明，都可以少敲很多字。
+
+它的目标很简单：
+
+- **输入更快**：把“脑子里已经想好的话”直接说出来。
+- **打扰更少**：不抢焦点，不弹大窗口，不破坏当前工作流。
+- **结果更稳**：识别、纠错、词汇表、风格和历史记录都围绕“把文字放到正确的位置”服务。
+
+## 适合谁
+
+VoiceInput 特别适合这些场景：
+
+- 经常和 ChatGPT、Claude、Codex、Cursor 或其他 AI 工具沟通，需要快速描述需求、上下文和修改意见。
+- 写代码时常要解释 bug、补充注释、写提交说明、记录排查过程。
+- 想快速记录灵感、会议要点、待办、长消息或文章草稿。
+- 中英文混说比较多，希望技术词、产品名和专有名词更稳定。
+- 喜欢 macOS 原生体验，希望工具安静、克制、常驻菜单栏。
+
+## 核心体验
+
+### 按住说话，松开输入
+
+VoiceInput 默认使用快捷键触发听写。按住说话时，屏幕上会出现一个轻量的转写浮层；松开后，最终文字会自动输入到当前光标位置。
+
+你不需要切换应用，也不需要手动复制粘贴。它就像键盘一样，服务于当前正在使用的 App。
+
+### 实时转写
+
+说话过程中可以看到实时文本。短句、长段说明、中文、英文和中英混合内容都会即时显示，方便你边说边确认方向。
+
+VoiceInput 内置系统语音识别，也支持本地 Qwen3-ASR 模型。系统自带模型开箱可用；本地模型适合更重视离线能力和隐私的场景。
+
+### 可选 LLM 纠错
+
+语音识别在技术词上容易出错，例如把 Python、JSON、TypeScript 识别成谐音或拆开的词。VoiceInput 可以在听写完成后，用你配置的 OpenAI 兼容模型做一次保守纠错。
+
+它不会替你润色或改写，只修明显听错的词。你仍然掌控原文语气和表达。
+
+### 工作台
+
+除了菜单栏快速输入，VoiceInput 也提供完整工作台：
+
+| 页面 | 可以做什么 |
+| --- | --- |
+| 首页 | 查看使用统计、今日目标、历史记录，快速复制或删除转写 |
+| 词汇表 | 管理常用词、专有名词和文本替换，让识别更贴合你的语境 |
+| 风格 | 为不同应用或场景设置输出风格，比如原文、正式、邮件、编程说明 |
+| 文件转写 | 导入音频或视频，排队转写，导出 txt、md、srt，或保存为笔记 |
+| 笔记 | 直接录音记笔记，也可以编辑、搜索和回看记录 |
+| 设置 | 管理输入设备、快捷键、模型、权限、隐私和数据 |
+| 帮助 | 查看权限提示、版本信息、项目链接和常见入口 |
+
+## 功能亮点
+
+- **全局听写**：在任意可编辑输入框里使用，不局限于 VoiceInput 自己的窗口。
+- **不抢焦点的浮层**：听写时只显示轻量浮层，不打断当前应用。
+- **系统自带与本地模型**：可在系统语音识别和 Qwen3-ASR 本地模型之间选择。
+- **输入设备选择**：支持选择麦克风，长设备名会自动收纳，不挤爆界面。
+- **快捷键录制**：在设置里直接录制想用的触发键，并配置短按行为。
+- **OpenAI 兼容模型**：可添加、测试、编辑和删除 Provider，API Key 保存到 macOS Keychain。
+- **词汇表和替换规则**：把常用词、易错词、缩写和固定替换交给 VoiceInput 记住。
+- **历史和笔记**：转写不只是一闪而过，后续可以搜索、复制、整理和复用。
+- **文件转写**：把录音、视频、会议音频转成文字，适合复盘和归档。
+- **数据可控**：历史、词汇、设置和笔记保存在本机；是否启用 LLM 由你决定。
+
+## 快速开始
+
+### 下载安装
+
+从 [GitHub Releases](https://github.com/xingbofeng/VoiceInput/releases/latest) 下载最新版本：
+
+1. 打开 `VoiceInput-1.1.2-macOS.dmg`
+2. 将 `VoiceInputApp` 拖入 `Applications` 文件夹
+3. 首次启动时，如果 macOS 提示无法验证，请按住 Control 点击应用，选择“打开”
+
+### 系统要求
+
+- macOS 14 Sonoma 或更高版本
+- 一台带麦克风的 Mac
+
+### 首次授权
+
+VoiceInput 需要几个系统权限才能正常工作：
+
+| 权限 | 用途 | 位置 |
+| --- | --- | --- |
+| 辅助功能 | 监听全局快捷键，并把文字输入到当前应用 | 系统设置 -> 隐私与安全性 -> 辅助功能 |
+| 麦克风 | 录制你的声音 | 系统设置 -> 隐私与安全性 -> 麦克风 |
+| 语音识别 | 使用系统自带语音识别模型 | 系统设置 -> 隐私与安全性 -> 语音识别 |
+
+如果你选择本地 Qwen3-ASR 模型，语音识别权限不是必须的；麦克风权限仍然需要。
+
+授权后如果快捷键没有响应，退出 VoiceInput 后重新打开即可。
+
+## 怎么使用
+
+### 语音输入
+
+1. 把光标放到任意输入框。
+2. 按住听写快捷键。
+3. 开始说话，浮层会实时显示识别结果。
+4. 松开快捷键，文字会自动输入到光标所在位置。
+
+### 录音记笔记
+
+打开工作台里的“笔记”，点击录音按钮即可开始记录。说话过程中会实时转写，完成后可以继续编辑，也可以在最近记录中回看。
+
+### 文件转写
+
+打开“文件转写”，选择音频或视频文件。VoiceInput 会显示任务进度，完成后可以复制、导出，或保存为笔记。
+
+### 让专有名词更准
+
+在“词汇表”里添加项目名、人名、产品名、技术词或固定替换规则。它们会参与后续转写和纠错流程，减少重复修改。
+
+### 配置 LLM 纠错
+
+打开“设置 -> 模型”，添加 OpenAI 兼容 Provider，填写 Base URL、Model 和 API Key。测试通过后，打开“启用 LLM 纠错”即可。
+
+API Key 会保存在 macOS Keychain，不会写入普通配置文件。
+
+## 隐私说明
+
+VoiceInput 的默认原则是：能留在本机的，就留在本机。
+
+- 历史记录、词汇表、笔记、任务和非敏感设置保存在本机。
+- API Key 保存到 macOS Keychain。
+- 系统自带语音识别可能由 Apple 处理音频，取决于系统能力和语言。
+- 本地 Qwen3-ASR 模型下载后在本机运行。
+- LLM 纠错默认关闭；开启后，只会把识别出的文本发到你配置的 API 服务。
+- VoiceInput 不会主动上传你的音频、笔记、历史记录或剪贴板内容。
+
+更完整的说明见 [隐私说明](docs/PRIVACY.md)。
+
+## 常见问题
+
+| 问题 | 处理方式 |
+| --- | --- |
+| 按快捷键没反应 | 检查辅助功能权限，退出后重新打开 VoiceInput |
+| 浮层出现但没有文字 | 检查麦克风权限、语音识别权限或当前模型状态 |
+| LLM 纠错没有生效 | 确认已在设置中启用，并且默认 Provider 测试成功 |
+| API Key 看不到明文 | 这是正常的，编辑时可点击显示按钮临时查看 |
+| 想离线使用 | 下载并选择 Qwen3-ASR 本地模型 |
+| 误删了历史或笔记 | 当前删除是本地操作，请谨慎确认后再删除 |
+
+## 从源码运行
+
+如果你想自己构建：
+
+```bash
+git clone https://github.com/xingbofeng/VoiceInput.git
+cd VoiceInput
+make run
+```
+
+常用命令：
+
+```bash
+make build
+make install
+swift test
+```
+
+## 灵感来源
+
+本项目灵感来源于 [yetone/voice-input-src](https://github.com/yetone/voice-input-src)，感谢他们的开创性工作。
