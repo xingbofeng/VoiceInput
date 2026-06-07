@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    name: Test and package macOS app
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Swift toolchain
+        run: swift --version
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build with warnings as errors
+        run: swift build -c debug -Xswiftc -warnings-as-errors
+
+      - name: Build release DMG
+        run: make dmg
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Sources/VoiceInputApp/Resources/Info.plist)
+          echo "value=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Verify bundle and DMG
+        run: |
+          codesign --verify --deep --strict .build/VoiceInputApp.app
+          lipo .build/VoiceInputApp.app/Contents/MacOS/VoiceInputApp -verify_arch arm64 x86_64
+          test -f .build/VoiceInputApp.app/Contents/Resources/AppIcon.icns
+          test -f dist/VoiceInput-${{ steps.version.outputs.value }}-macOS.dmg
+          shasum -a 256 -c dist/VoiceInput-${{ steps.version.outputs.value }}-macOS.dmg.sha256
+
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceInput-macOS
+          path: |
+            dist/VoiceInput-${{ steps.version.outputs.value }}-macOS.dmg
+            dist/VoiceInput-${{ steps.version.outputs.value }}-macOS.dmg.sha256
+          if-no-files-found: error
