@@ -13,3 +13,11 @@ implementation-notes.md
 .playwright-mcp/
 voiceinput-landing-page.png
 voiceinput-landing-en.png
+
+# Video production artifacts
+.thumbnails/
+.waveform-cache/
+audio/
+img-*.png
+index.html
+voiceinput-demo.mp4

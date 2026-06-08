@@ -2,7 +2,7 @@ import Speech
 
 /// Streaming speech recognizer using Apple's SFSpeechRecognizer.
 /// Provides real-time transcription updates as audio is received.
-final class SpeechRecognizer: NSObject {
+final class SpeechRecognizer: NSObject, @unchecked Sendable, ASREngine {
     // MARK: - Types
 
     typealias TranscriptionHandler = (String, Bool) -> Void  // (text, isFinal)
@@ -40,7 +40,8 @@ final class SpeechRecognizer: NSObject {
     // MARK: - Lifecycle
 
     func configure(locale: Locale) {
-        recognizer = nil
+        recognitionTask?.cancel()
+        recognitionTask = nil
         recognizer = SFSpeechRecognizer(locale: locale)
         isAvailable = recognizer?.isAvailable ?? false
     }
@@ -59,20 +60,11 @@ final class SpeechRecognizer: NSObject {
         recognitionTask = nil
 
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        guard let request = recognitionRequest else {
-            throw Error.requestCreationFailed
-        }
+        recognitionRequest?.shouldReportPartialResults = true
+        recognitionRequest?.requiresOnDeviceRecognition = false
+        recognitionRequest?.taskHint = .dictation
 
-        request.shouldReportPartialResults = true
-
-        // For macOS, we don't use on-device; always use network
-        if #available(macOS 14.0, *) {
-            // on-device is not supported on macOS
-        }
-        request.requiresOnDeviceRecognition = false
-
-        // taskHint based on expected content
-        request.taskHint = .dictation
+        guard let request = recognitionRequest else { return }
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self = self else { return }
@@ -85,8 +77,9 @@ final class SpeechRecognizer: NSObject {
                 if wasCancelled {
                     return
                 }
+                let capturedOnError = self.onError
                 DispatchQueue.main.async {
-                    self.onError?(error)
+                    capturedOnError?(error)
                 }
                 return
             }
@@ -94,8 +87,9 @@ final class SpeechRecognizer: NSObject {
             if let result = result {
                 let text = result.bestTranscription.formattedString
                 let isFinal = result.isFinal
+                let capturedOnTranscription = self.onTranscription
                 DispatchQueue.main.async {
-                    self.onTranscription?(text, isFinal)
+                    capturedOnTranscription?(text, isFinal)
                 }
             }
         }
@@ -126,7 +120,6 @@ final class SpeechRecognizer: NSObject {
     enum Error: Swift.Error, LocalizedError {
         case authorizationDenied
         case recognizerUnavailable
-        case requestCreationFailed
 
         var errorDescription: String? {
             switch self {
@@ -134,8 +127,6 @@ final class SpeechRecognizer: NSObject {
                 return "未获得语音识别权限。"
             case .recognizerUnavailable:
                 return "语音识别服务不可用，请检查网络连接。"
-            case .requestCreationFailed:
-                return "无法创建语音识别请求。"
             }
         }
     }

@@ -2,7 +2,7 @@ import Foundation
 
 /// LLM-based text refiner using OpenAI-compatible API.
 /// Conservatively corrects speech recognition errors, especially for CJK-English mixed content.
-final class LLMRefiner {
+final class LLMRefiner: @unchecked Sendable {
     // MARK: - Keys
 
     private let defaults: UserDefaults

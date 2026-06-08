@@ -25,10 +25,6 @@ final class WaveformView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    deinit {
-        stopAnimation()
-    }
-
     // MARK: - Public
 
     /// Update the RMS level that drives the waveform. Call on any thread.
@@ -42,7 +38,9 @@ final class WaveformView: NSView {
             withTimeInterval: 1.0 / 60.0,
             repeats: true
         ) { [weak self] _ in
-            self?.tick()
+            MainActor.assumeIsolated {
+                self?.tick()
+            }
         }
     }
 

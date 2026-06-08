@@ -1,3 +1,12 @@
+const release = {
+  version: "1.0.1",
+  tag: "v1.0.1",
+  assetName: "VoiceInput-1.0.1-macOS.dmg"
+};
+
+const releaseDownloadURL =
+  `https://github.com/xingbofeng/VoiceInput/releases/download/${release.tag}/${release.assetName}`;
+
 const copy = {
   zh: {
     eyebrow: "原生 macOS 语音输入",
@@ -6,7 +15,7 @@ const copy = {
     heroCopy: "按住右 Command，自然说话，松手即输入。VoiceInput 让中文、英文与技术术语顺畅落在任何光标之后。",
     download: "下载 macOS App",
     downloadMeta: "macOS 14+ · Apple Silicon + Intel",
-    releaseNote: "v1.0.0 · 免费开源",
+    releaseNote: `${release.tag} · 免费开源`,
     transcript: "让声音越过键盘，直接抵达光标。",
     holdHint: "按住说话",
     flowTitle: "没有录音按钮。<br>没有上下文切换。",
@@ -29,7 +38,7 @@ const copy = {
     heroCopy: "Hold Right Command, speak naturally, and release. VoiceInput puts Chinese, English, and technical terms exactly where your cursor is.",
     download: "Download for macOS",
     downloadMeta: "macOS 14+ · Apple Silicon + Intel",
-    releaseNote: "v1.0.0 · Free & open source",
+    releaseNote: `${release.tag} · Free & open source`,
     transcript: "Let your voice skip the keyboard and meet the cursor.",
     holdHint: "Hold to speak",
     flowTitle: "No record button.<br>No context switching.",
@@ -51,6 +60,10 @@ const languageButton = document.querySelector(".language-switch");
 const languageLabel = document.querySelector("[data-lang-label]");
 const initialLanguage = localStorage.getItem("voiceinput-language")
   ?? (navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en");
+
+document.querySelectorAll("[data-download-link]").forEach((element) => {
+  element.href = releaseDownloadURL;
+});
 
 function setLanguage(language) {
   const selected = copy[language];

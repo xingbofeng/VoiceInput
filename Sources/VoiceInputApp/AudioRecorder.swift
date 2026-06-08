@@ -1,7 +1,7 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// Manages audio capture from the default microphone with real-time RMS level metering.
-final class AudioRecorder: NSObject {
+final class AudioRecorder: NSObject, @unchecked Sendable {
     // MARK: - Types
 
     @MainActor protocol Delegate: AnyObject {
@@ -13,6 +13,14 @@ final class AudioRecorder: NSObject {
         case granted
         case denied
         case notDetermined
+    }
+
+    enum AudioRecorderError: Error, LocalizedError {
+        case microphoneUnavailable
+
+        var errorDescription: String? {
+            "麦克风不可用。请检查系统权限设置。"
+        }
     }
 
     // MARK: - Properties
@@ -59,9 +67,10 @@ final class AudioRecorder: NSObject {
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self = self else { return }
             let rms = Self.calculateRMS(from: buffer)
+            let capturedDelegate = self.delegate
             DispatchQueue.main.async {
-                self.delegate?.audioRecorder(self, didReceiveBuffer: buffer)
-                self.delegate?.audioRecorder(self, didUpdateRMS: rms)
+                capturedDelegate?.audioRecorder(self, didReceiveBuffer: buffer)
+                capturedDelegate?.audioRecorder(self, didUpdateRMS: rms)
             }
         }
 
@@ -72,7 +81,7 @@ final class AudioRecorder: NSObject {
         } catch {
             inputNode.removeTap(onBus: 0)
             engine.stop()
-            throw error
+            throw AudioRecorderError.microphoneUnavailable
         }
     }
 

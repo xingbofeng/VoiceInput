@@ -11,7 +11,7 @@ permissions:
 jobs:
   release:
     name: Build and publish release
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
 
     steps:
@@ -24,18 +24,24 @@ jobs:
       - name: Build release DMG
         run: make dmg
 
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Sources/VoiceInputApp/Resources/Info.plist)
+          echo "value=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Verify release assets
         run: |
           codesign --verify --deep --strict .build/VoiceInputApp.app
           lipo .build/VoiceInputApp.app/Contents/MacOS/VoiceInputApp -verify_arch arm64 x86_64
-          shasum -a 256 -c dist/VoiceInput-1.0.0-macOS.dmg.sha256
+          shasum -a 256 -c dist/VoiceInput-${{ steps.version.outputs.value }}-macOS.dmg.sha256
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: VoiceInput 1.0.0
-          body_path: .github/release-notes/v1.0.0.md
+          name: VoiceInput ${{ steps.version.outputs.value }}
+          body_path: .github/release-notes/v1.0.1.md
           files: |
-            dist/VoiceInput-1.0.0-macOS.dmg
-            dist/VoiceInput-1.0.0-macOS.dmg.sha256
+            dist/VoiceInput-${{ steps.version.outputs.value }}-macOS.dmg
+            dist/VoiceInput-${{ steps.version.outputs.value }}-macOS.dmg.sha256
           fail_on_unmatched_files: true

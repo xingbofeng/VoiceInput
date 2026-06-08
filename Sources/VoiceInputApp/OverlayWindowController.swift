@@ -167,7 +167,7 @@ final class OverlayWindowController: NSWindowController {
     func updateTranscription(_ text: String, isRefining: Bool) {
         let displayText: String
         if isRefining {
-            displayText = "Refining..."
+            displayText = text.isEmpty ? "Refining..." : text
             textLabel.textColor = NSColor.white.withAlphaComponent(0.5)
             waveformView.stopAnimation()
             waveformView.isHidden = true
@@ -231,8 +231,10 @@ final class OverlayWindowController: NSWindowController {
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             window.animator().alphaValue = 0.0
         } completionHandler: {
-            window.orderOut(nil)
-            self.visualEffectView.layer?.removeAnimation(forKey: "voiceinput.exit")
+            MainActor.assumeIsolated {
+                window.orderOut(nil)
+                self.visualEffectView.layer?.removeAnimation(forKey: "voiceinput.exit")
+            }
         }
     }
 

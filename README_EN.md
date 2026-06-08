@@ -17,18 +17,28 @@
   </p>
   <p>
     🌐 <a href="https://xingbofeng.github.io/VoiceInput/">Website</a>
+    &nbsp;·&nbsp;
+    🎬 <a href="docs/voiceinput-demo-land.mp4">Intro Video</a>
   </p>
 </div>
 
 ## Why VoiceInput
 
-Voice input shouldn't be a workflow you need to manage. VoiceInput compresses the interaction into muscle memory:
+After vibe coding, writing code is no longer the same.
 
-1. Hold Right `Command`
-2. Speak naturally
-3. Release Right `Command`
+It used to be mostly about typing. Now it's about describing intent, providing context, explaining problems, and steering agents. Speaking these things comes naturally — but typing them out, word by word, is slow.
 
-Real-time transcription appears in a frosted-glass capsule at the bottom of your screen. When recognition completes, VoiceInput automatically handles input method switching, pasting, and clipboard restoration. You just keep writing.
+I tried existing tools. Some are feature-rich, some are smart, some support local or cloud models. But what I actually wanted was simpler: a "voice keyboard," not a voice assistant.
+
+VoiceInput is my answer to that small problem.
+
+**It does exactly three things:**
+
+- **Stays light.** Hold Right Command, speak, release — text appears right where your cursor is. It never steals focus, never interrupts your flow, and never forces you into complex configuration.
+- **Gets technical terms right.** Optional LLM refinement fixes only obvious misrecognitions — "配森" → Python, "杰森" → JSON, "Type Script" → TypeScript. No polishing, no rewriting, no second-guessing the user.
+- **Keeps you in flow.** When writing code feels more and more like describing ideas to an AI, the input method should feel just as natural.
+
+VoiceInput is not a big product, and it's not trying to replace every voice input tool out there. It's just the input layer I wanted for my own vibe coding workflow.
 
 ## Highlights
 
@@ -42,6 +52,9 @@ Real-time transcription appears in a frosted-glass capsule at the bottom of your
 | Reliable injection | CJK input methods temporarily switched to ABC/US, Command-V pasted, then restored |
 | Full clipboard restore | Saves and restores all pasteboard items and types, not just plain text |
 | Optional LLM refinement | Supports OpenAI-compatible API, targeting Chinese-English technical term misrecognitions |
+| Multi-engine switching | Pluggable ASR architecture with Apple Speech and Qwen3-ASR |
+| Customizable shortcuts | Record any key, adjust long-press threshold, configure short-press behavior |
+| Settings panel | Three-tab settings window: ASR / LLM / Shortcut |
 | Menu-bar only | `LSUIElement`, no Dock icon |
 
 ## Quick Start
@@ -133,6 +146,27 @@ Open the menu bar icon → `语言 / Language`:
 
 Your selection is persisted in `UserDefaults`.
 
+### ASR Engine
+
+VoiceInput supports pluggable speech recognition engines. Switch from the menu bar `ASR Engine` submenu:
+
+| Engine | Description |
+| --- | --- |
+| Apple Speech | Built-in, works out of the box, requires Speech Recognition permission |
+| Qwen3-ASR | Experimental engine, only requires Microphone permission (in development) |
+
+Qwen3-ASR cannot be selected until a local model is configured. Open the menu bar icon → `设置...` → `ASR` and click `下载模型...`; VoiceInput shows download progress in the settings panel and saves the model under the local Application Support directory. Qwen3-ASR becomes selectable after the download completes. When Qwen3-ASR is selected, Apple Speech Recognition permission is not requested.
+
+### Shortcut Settings
+
+Open the menu bar icon → `设置...` → `快捷键` to:
+
+- **Record shortcut**: Click "Record" and press any key (supports modifier keys and regular keys)
+- **Long-press threshold**: Adjust the duration that distinguishes short press from long press (default 500ms)
+- **Short-press behavior**: Choose "No action" or "Toggle continuous listening" on short press
+
+Changes take effect immediately — no restart required.
+
 ## LLM Refinement
 
 Apple Speech is fast, but technical terms in mixed Chinese-English speech can still become phonetic homophones. VoiceInput can run a single, extremely conservative correction pass through an OpenAI-compatible API before pasting:
@@ -144,7 +178,7 @@ Apple Speech is fast, but technical terms in mixed Chinese-English speech can st
 
 It will never polish, rewrite, or compress your content. When the model is uncertain, the system prompt instructs it to return the input unchanged.
 
-Open the menu bar icon → `LLM Refinement` → `LLM 设置...` and fill in:
+Open the menu bar icon → `设置...` → `LLM` and fill in:
 
 | Field | Example |
 | --- | --- |
@@ -160,7 +194,7 @@ https://api.example.com/v1
 https://api.example.com/v1/chat/completions
 ```
 
-Click `Test` to verify the connection, then `Save`. Enable refinement from the `LLM Refinement` submenu. After recording, the HUD shows `Refining...`; once the model returns, the corrected text is injected. On network failure, it falls back to the raw transcription automatically.
+Click `Test` to verify the connection, then `Save`. Enable refinement from the menu bar `LLM 纠错` item. After recording, the HUD shows `Refining...`; once the model returns, the corrected text is injected. On network failure, it falls back to the raw transcription automatically.
 
 > The API Key is stored in local `UserDefaults`, not committed to the repository, but is not encrypted via Keychain. Only configure this on a trusted Mac user account.
 
@@ -189,7 +223,13 @@ flowchart LR
 AppDelegate
 ├── KeyMonitor                 Right Command event tap and suppression
 ├── AudioRecorder              AVAudioEngine capture and RMS
-├── SpeechRecognizer           Streaming Apple Speech session
+├── ASRManager                 ASR engine selection and factory
+│   ├── ASREngine              Pluggable engine protocol
+│   ├── SpeechRecognizer       Apple Speech implementation
+│   ├── Qwen3ASREngine         Qwen3-ASR implementation
+│   └── AudioPreprocessor      Fbank feature extraction (Accelerate)
+├── ShortcutManager            Hotkey config, threshold, short-press behavior
+├── SettingsWindowController   Tabbed settings UI (ASR / LLM / Shortcut)
 ├── OverlayWindowController    Non-activating capsule HUD
 ├── TextInjector               Input source, paste, clipboard restore
 ├── LLMRefiner                 OpenAI-compatible conservative correction

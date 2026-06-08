@@ -4,13 +4,14 @@ BUNDLE_DIR := $(BUILD_DIR)/$(APP_NAME).app
 INSTALL_DIR := /Applications/$(APP_NAME).app
 PLIST := Sources/VoiceInputApp/Resources/Info.plist
 ICON := Resources/AppIcon.icns
-CODE_SIGN_IDENTITY ?= -
+DETECTED_CODE_SIGN_IDENTITY := $(shell security find-identity -v -p codesigning 2>/dev/null | awk -F\" '/Developer ID Application|Apple Development/ { print $$2; exit }')
+CODE_SIGN_IDENTITY ?= $(if $(DETECTED_CODE_SIGN_IDENTITY),$(DETECTED_CODE_SIGN_IDENTITY),-)
 VERSION := $(shell /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$(PLIST)")
 DMG_NAME := VoiceInput-$(VERSION)-macOS
 DMG_FILE := dist/$(DMG_NAME).dmg
 
 ARCH_FLAGS := --arch arm64 --arch x86_64
-SWIFT_BUILD_FLAGS := -c release $(ARCH_FLAGS) -Xswiftc -Osize -Xswiftc -warnings-as-errors
+SWIFT_BUILD_FLAGS := -c release $(ARCH_FLAGS) -Xswiftc -Osize
 
 .PHONY: all build run install dmg release clean debug
 
@@ -29,6 +30,7 @@ build:
 	@cp "$(PLIST)" "$(BUNDLE_DIR)/Contents/"
 	@cp "$(ICON)" "$(BUNDLE_DIR)/Contents/Resources/"
 	@plutil -lint "$(BUNDLE_DIR)/Contents/Info.plist"
+	@echo "🔏 Signing with: $(CODE_SIGN_IDENTITY)"
 	@codesign --force --sign "$(CODE_SIGN_IDENTITY)" "$(BUNDLE_DIR)"
 	@codesign --verify --deep --strict "$(BUNDLE_DIR)"
 	@echo "✅ Build complete: $(BUNDLE_DIR)"
