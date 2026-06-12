@@ -6,13 +6,20 @@ final class LLMRefiner: @unchecked Sendable {
     // MARK: - Keys
 
     private let defaults: UserDefaults
+    private let credentialStore: CredentialStore
     private let keyEnabled = "LLMRefiner_Enabled"
     private let keyBaseURL = "LLMRefiner_BaseURL"
     private let keyAPIKey = "LLMRefiner_APIKey"
     private let keyModel = "LLMRefiner_Model"
+    private let apiKeyAccount = "llm-api-key"
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        credentialStore: CredentialStore = KeychainCredentialStore()
+    ) {
         self.defaults = defaults
+        self.credentialStore = credentialStore
+        migrateLegacyAPIKeyIfNeeded()
     }
 
     // MARK: - Settings
@@ -28,8 +35,16 @@ final class LLMRefiner: @unchecked Sendable {
     }
 
     var apiKey: String? {
-        get { defaults.string(forKey: keyAPIKey) }
-        set { set(newValue, forKey: keyAPIKey) }
+        get {
+            guard let value = try? credentialStore.readCredential(account: apiKeyAccount),
+                  !value.isEmpty else {
+                return nil
+            }
+            return value
+        }
+        set {
+            try? setAPIKey(newValue)
+        }
     }
 
     var model: String? {
@@ -57,26 +72,35 @@ final class LLMRefiner: @unchecked Sendable {
         }
     }
 
+    func setAPIKey(_ value: String?) throws {
+        defer {
+            defaults.removeObject(forKey: keyAPIKey)
+        }
+
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmed, !trimmed.isEmpty else {
+            try credentialStore.deleteCredential(account: apiKeyAccount)
+            return
+        }
+
+        try credentialStore.saveCredential(trimmed, account: apiKeyAccount)
+    }
+
+    private func migrateLegacyAPIKeyIfNeeded() {
+        guard let legacyAPIKey = defaults.string(forKey: keyAPIKey) else {
+            return
+        }
+
+        let trimmed = legacyAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            try? credentialStore.saveCredential(trimmed, account: apiKeyAccount)
+        }
+        defaults.removeObject(forKey: keyAPIKey)
+    }
+
     // MARK: - System Prompt
 
-    private let systemPrompt = """
-        You are a conservative speech recognition error corrector. Your ONLY job is to fix \
-        OBVIOUS speech recognition errors. Follow these rules strictly:
-
-        1. ONLY correct clear speech-to-text mistakes, especially:
-           - Chinese homophone errors (e.g., 「配森」→「Python」, 「杰森」→「JSON」, 「扣顶」→「coding」)
-           - English technical terms incorrectly transcribed as Chinese characters
-           - Chinese characters that are obviously the wrong character due to homophones
-        2. Do NOT rewrite, polish, rephrase, or improve the text in any way.
-        3. Do NOT change word choice, sentence structure, or tone.
-        4. Do NOT add, remove, or alter punctuation unless it's clearly wrong.
-        5. If the input text appears correct or you're unsure, return it EXACTLY as-is.
-        6. Preserve ALL original formatting, spacing, and line breaks.
-        7. Output ONLY the corrected text — no explanations, no notes, no quotation marks.
-
-        The user spoke in Chinese and/or English. The speech recognizer may have made mistakes \
-        converting between the two languages. Your task is to fix only those conversion errors.
-        """
+    private let systemPrompt = PromptBuilder.conservativeSystemPrompt
 
     // MARK: - API Call
 
@@ -134,35 +158,49 @@ final class LLMRefiner: @unchecked Sendable {
     }
 
     func refine(_ text: String) async throws -> String {
+        try await refine(
+            TextRefinementRequest(
+                text: text,
+                systemPrompt: systemPrompt,
+                model: nil,
+                temperature: nil
+            )
+        )
+    }
+
+    func refine(_ request: TextRefinementRequest) async throws -> String {
         guard isConfigured,
               let baseURL = baseURL,
               let apiKey = apiKey,
-              let model = model else {
+              let configuredModel = model else {
             throw Error.notConfigured
         }
 
+        let selectedModel = request.model?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? request.model!
+            : configuredModel
         let chatURL = try Self.chatCompletionsURL(baseURL: baseURL)
 
-        var request = URLRequest(url: chatURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 15.0
+        var urlRequest = URLRequest(url: chatURL)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        urlRequest.timeoutInterval = 15.0
 
         let body: [String: Any] = [
-            "model": model,
+            "model": selectedModel,
             "messages": [
-                ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": text]
+                ["role": "system", "content": request.systemPrompt],
+                ["role": "user", "content": request.text]
             ],
-            "temperature": 0.0,
-            "max_tokens": max(100, text.count + 50),
+            "temperature": request.temperature ?? 0.0,
+            "max_tokens": max(100, request.text.count + 50),
             "stream": false
         ]
 
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw Error.invalidResponse
@@ -182,7 +220,7 @@ final class LLMRefiner: @unchecked Sendable {
 
         // If LLM returned empty or almost empty, fall back to original
         guard !refined.isEmpty else {
-            return text
+            return request.text
         }
 
         return refined

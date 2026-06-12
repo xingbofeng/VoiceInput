@@ -173,21 +173,15 @@ final class Qwen3ModelDownloader: NSObject, URLSessionDownloadDelegate, @uncheck
     }
 
     private func modelRootURL() throws -> URL {
-        guard let applicationSupportURL = fileManager.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
+        let paths: ApplicationSupportPaths
+        do {
+            paths = try ApplicationSupportPaths.live(fileManager: fileManager)
+        } catch ApplicationSupportPathsError.applicationSupportDirectoryUnavailable {
             throw Qwen3ModelDownloadError.applicationSupportUnavailable
         }
 
-        let rootURL = applicationSupportURL
-            .appendingPathComponent("VoiceInput", isDirectory: true)
-            .appendingPathComponent("Models", isDirectory: true)
-        try fileManager.createDirectory(
-            at: rootURL,
-            withIntermediateDirectories: true
-        )
-        return rootURL
+        try paths.ensureDirectories(fileManager: fileManager)
+        return paths.modelsDirectory
     }
 
     private func downloadFile(

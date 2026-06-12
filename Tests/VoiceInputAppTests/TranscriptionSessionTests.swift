@@ -25,6 +25,14 @@ final class TranscriptionSessionTests: XCTestCase {
         XCTAssertEqual(session.timeout(), "最新 partial")
     }
 
+    func testFallbackUsesLatestPartialEvenBeforeRelease() {
+        var session = TranscriptionSession()
+
+        XCTAssertNil(session.update(text: "最新 partial", isFinal: false))
+        XCTAssertEqual(session.fallbackToLatestText(), "最新 partial")
+        XCTAssertNil(session.update(text: "迟到文本", isFinal: true))
+    }
+
     func testSessionCanOnlyCompleteOnce() {
         var session = TranscriptionSession()
 

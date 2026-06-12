@@ -9,7 +9,7 @@ final class AudioRecorder: NSObject, @unchecked Sendable {
         func audioRecorder(_ recorder: AudioRecorder, didUpdateRMS rms: Float)
     }
 
-    enum PermissionStatus {
+    enum PermissionStatus: Equatable {
         case granted
         case denied
         case notDetermined

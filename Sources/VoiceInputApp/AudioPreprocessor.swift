@@ -48,7 +48,7 @@ final class AudioPreprocessor {
         converter.convert(to: targetBuffer, error: &error, withInputFrom: inputBlock)
 
         if let error = error {
-            print("AudioPreprocessor: resample error: \(error)")
+            AppLogger.audio.error("AudioPreprocessor: resample error: \(error)")
             return nil
         }
 

@@ -1,7 +1,7 @@
 const release = {
-  version: "1.0.1",
-  tag: "v1.0.1",
-  assetName: "VoiceInput-1.0.1-macOS.dmg"
+  version: "1.1.0",
+  tag: "v1.1.0",
+  assetName: "VoiceInput-1.1.0-macOS.dmg"
 };
 
 const releaseDownloadURL =

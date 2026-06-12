@@ -22,6 +22,11 @@ struct TranscriptionSession {
         return complete()
     }
 
+    mutating func fallbackToLatestText() -> String? {
+        guard !completed else { return nil }
+        return complete()
+    }
+
     private mutating func complete() -> String {
         completed = true
         return latestText

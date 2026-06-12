@@ -1,6 +1,6 @@
 import Foundation
 
-enum ShortPressBehavior: String, CaseIterable {
+enum ShortPressBehavior: String, CaseIterable, Codable, Equatable {
     case toggleListening
     case none
 }

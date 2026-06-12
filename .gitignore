@@ -11,6 +11,7 @@ xcuserdata/
 implementation-notes.md
 
 .playwright-mcp/
+.codegraph/
 voiceinput-landing-page.png
 voiceinput-landing-en.png
 

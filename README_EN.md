@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/badge/macOS-14%2B-111827?style=flat-square&logo=apple&logoColor=white" alt="macOS 14+">
     <img src="https://img.shields.io/badge/Swift-5.9%2B-F05138?style=flat-square&logo=swift&logoColor=white" alt="Swift 5.9+">
     <img src="https://img.shields.io/badge/UI-AppKit-6366F1?style=flat-square" alt="AppKit">
-    <img src="https://img.shields.io/badge/tests-30_pass-10B981?style=flat-square" alt="30 tests">
+    <img src="https://img.shields.io/badge/tests-swift%20test-10B981?style=flat-square" alt="swift test">
     <a href="https://github.com/xingbofeng/VoiceInput/releases/latest"><img src="https://img.shields.io/github/v/release/xingbofeng/VoiceInput?style=flat-square&label=release" alt="Latest release"></a>
   </p>
   <p>
@@ -53,15 +53,20 @@ VoiceInput is not a big product, and it's not trying to replace every voice inpu
 | Full clipboard restore | Saves and restores all pasteboard items and types, not just plain text |
 | Optional LLM refinement | Supports OpenAI-compatible API, targeting Chinese-English technical term misrecognitions |
 | Multi-engine switching | Pluggable ASR architecture with Apple Speech and Qwen3-ASR |
+| Workbench | Home, glossary, styles, file transcription, notes, dictation models, settings, help |
+| Glossary and replacements | Terms, aliases, JSON/CSV import/export, before/after LLM replacement rules |
+| Style system | Original, formal, casual, energetic, coding, email styles, plus app-based auto selection |
+| File transcription | Audio/video queue, progress, cancel, retry, txt/md/srt export, save as note |
+| Notes | Markdown drafts, search, tags, save from history or file transcription |
 | Customizable shortcuts | Record any key, adjust long-press threshold, configure short-press behavior |
-| Settings panel | Three-tab settings window: ASR / LLM / Shortcut |
+| Settings center | General, system, data and privacy settings, including import/export and reset |
 | Menu-bar only | `LSUIElement`, no Dock icon |
 
 ## Quick Start
 
 ### Download & Install
 
-Download `VoiceInput-1.0.0-macOS.dmg` from [GitHub Releases](https://github.com/xingbofeng/VoiceInput/releases/latest):
+Download `VoiceInput-1.1.0-macOS.dmg` from [GitHub Releases](https://github.com/xingbofeng/VoiceInput/releases/latest):
 
 1. Open the DMG file
 2. Drag `VoiceInputApp` into the `Applications` folder
@@ -148,14 +153,14 @@ Your selection is persisted in `UserDefaults`.
 
 ### ASR Engine
 
-VoiceInput supports pluggable speech recognition engines. Switch from the menu bar `ASR Engine` submenu:
+VoiceInput supports pluggable speech recognition engines. Switch from the menu bar `ASR Engine` submenu, or use the workbench `Dictation Models` page to inspect capability tags, default model, and fallback behavior:
 
 | Engine | Description |
 | --- | --- |
 | Apple Speech | Built-in, works out of the box, requires Speech Recognition permission |
 | Qwen3-ASR | Experimental engine, only requires Microphone permission (in development) |
 
-Qwen3-ASR cannot be selected until a local model is configured. Open the menu bar icon → `设置...` → `ASR` and click `下载模型...`; VoiceInput shows download progress in the settings panel and saves the model under the local Application Support directory. Qwen3-ASR becomes selectable after the download completes. When Qwen3-ASR is selected, Apple Speech Recognition permission is not requested.
+Qwen3-ASR cannot be selected until a local model is configured. Open the workbench → `Dictation Models` and download the local model; VoiceInput shows download progress and saves the model under the local Application Support directory. Qwen3-ASR becomes selectable after the download completes. When Qwen3-ASR is selected, Apple Speech Recognition permission is not requested.
 
 ### Shortcut Settings
 
@@ -166,6 +171,20 @@ Open the menu bar icon → `设置...` → `快捷键` to:
 - **Short-press behavior**: Choose "No action" or "Toggle continuous listening" on short press
 
 Changes take effect immediately — no restart required.
+
+## Workbench
+
+Open the menu bar icon → `打开工作台...` to use the full workbench:
+
+| Page | Purpose |
+| --- | --- |
+| Home | Stats, goal progress, history details, copy, delete, reprocess |
+| Glossary | Terms, aliases, replacement rules, JSON/CSV import and export |
+| Styles | Prompt editing, default style, app rules, and automatic selection through the global model |
+| File Transcription | Drag audio/video files, queue transcription, export txt/md/srt, save as note |
+| Notes | Markdown editing, search, tags, export |
+| Settings | Unified OpenAI-compatible and dictation models, input devices, shortcuts, permissions, privacy, and data |
+| Help | Version, permission hints, project links |
 
 ## LLM Refinement
 
@@ -178,7 +197,7 @@ Apple Speech is fast, but technical terms in mixed Chinese-English speech can st
 
 It will never polish, rewrite, or compress your content. When the model is uncertain, the system prompt instructs it to return the input unchanged.
 
-Open the menu bar icon → `设置...` → `LLM` and fill in:
+Open the workbench → `LLM Provider`, or use the legacy settings entry, and fill in:
 
 | Field | Example |
 | --- | --- |
@@ -194,9 +213,7 @@ https://api.example.com/v1
 https://api.example.com/v1/chat/completions
 ```
 
-Click `Test` to verify the connection, then `Save`. Enable refinement from the menu bar `LLM 纠错` item. After recording, the HUD shows `Refining...`; once the model returns, the corrected text is injected. On network failure, it falls back to the raw transcription automatically.
-
-> The API Key is stored in local `UserDefaults`, not committed to the repository, but is not encrypted via Keychain. Only configure this on a trusted Mac user account.
+Click test connection to verify the service, and refresh models to record available models and latency. API keys are stored only in macOS Keychain; plaintext keys written to `UserDefaults` by older builds are migrated and removed when configuration loads. Enable refinement from the menu bar `LLM 纠错` item. After recording, the HUD shows `Refining...`; once the model returns, the corrected text is injected. On network failure, it falls back to the raw transcription automatically.
 
 ## How It Works
 
@@ -210,10 +227,15 @@ flowchart LR
     SPEECH --> PARTIAL["Streaming text"]
     PARTIAL --> HUD
     HOTKEY2["Release Right Command"] --> FINAL["Final result or bounded timeout"]
-    FINAL --> CHECK{"LLM enabled?"}
-    CHECK -- No --> PASTE["Input source guard + Command-V"]
+    FINAL --> PIPE["TextProcessingPipeline"]
+    PIPE --> RULE1["before LLM replacements"]
+    RULE1 --> PROMPT["PromptBuilder: style + glossary"]
+    PROMPT --> CHECK{"LLM enabled?"}
+    CHECK -- No --> RULE2["after LLM replacements"]
     CHECK -- Yes --> REFINE["OpenAI-compatible refine"]
-    REFINE --> PASTE
+    REFINE --> RULE2
+    RULE2 --> HIST["History save"]
+    HIST --> PASTE["Input source guard + Command-V"]
     PASTE --> RESTORE["Restore input source + clipboard"]
 ```
 
@@ -228,11 +250,16 @@ AppDelegate
 │   ├── SpeechRecognizer       Apple Speech implementation
 │   ├── Qwen3ASREngine         Qwen3-ASR implementation
 │   └── AudioPreprocessor      Fbank feature extraction (Accelerate)
+├── DictationOrchestrator      ASR final/partial fallback, pipeline, injection, history
+├── TextProcessingPipeline     Replacement rules, PromptBuilder, conservative LLM fallback
+├── WindowCoordinator          Workbench window lifecycle
+├── MainShellView              SwiftUI workbench navigation
 ├── ShortcutManager            Hotkey config, threshold, short-press behavior
-├── SettingsWindowController   Tabbed settings UI (ASR / LLM / Shortcut)
 ├── OverlayWindowController    Non-activating capsule HUD
 ├── TextInjector               Input source, paste, clipboard restore
 ├── LLMRefiner                 OpenAI-compatible conservative correction
+├── Repositories               SQLite history/glossary/style/provider/jobs/notes/settings
+├── KeychainCredentialStore    API key persistence
 └── LanguageManager            Locale selection and persistence
 ```
 
@@ -241,9 +268,10 @@ AppDelegate
 VoiceInput does not include analytics or telemetry.
 
 - Audio is captured locally by `AVAudioEngine`.
-- Speech recognition currently sets `requiresOnDeviceRecognition = false`; Apple Speech may process audio over the network.
+- Speech recognition provider is user-selectable. Apple Speech may process audio over the network; local Qwen3-ASR runs on-device after the model is downloaded.
 - LLM refinement is disabled unless you enable and configure it.
 - When LLM refinement is enabled, only the recognized text is sent to your configured API endpoint.
+- Glossary, history, jobs, notes and non-secret settings live in local SQLite. API keys live in Keychain.
 - Clipboard content is held in memory only for the duration of text injection, then restored.
 
 ## Development

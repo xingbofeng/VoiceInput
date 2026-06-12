@@ -1,6 +1,6 @@
 import Foundation
 
-final class ASRManager: ASREngineFactory {
+final class ASRManager: ASREngineFactory, @unchecked Sendable {
     enum ModelSize: String, CaseIterable, Equatable {
         case size0_6B = "0.6B"
         case size1_7B = "1.7B"

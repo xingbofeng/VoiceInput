@@ -3,6 +3,74 @@ import XCTest
 @testable import VoiceInputApp
 
 final class LLMRefinerTests: XCTestCase {
+    func testLegacyAPIKeyMigratesToCredentialStoreAndIsRemovedFromDefaults() throws {
+        let suiteName = "VoiceInputAppTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let store = InMemoryCredentialStore()
+        let legacyKey = "legacy-secret-\(UUID().uuidString)"
+
+        defaults.set(legacyKey, forKey: "LLMRefiner_APIKey")
+
+        let refiner = LLMRefiner(defaults: defaults, credentialStore: store)
+
+        XCTAssertEqual(refiner.apiKey, legacyKey)
+        XCTAssertNil(defaults.string(forKey: "LLMRefiner_APIKey"))
+        XCTAssertEqual(store.value(for: "llm-api-key"), legacyKey)
+    }
+
+    func testSettingAPIKeyStoresOnlyInCredentialStore() throws {
+        let suiteName = "VoiceInputAppTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let store = InMemoryCredentialStore()
+        let refiner = LLMRefiner(defaults: defaults, credentialStore: store)
+
+        refiner.apiKey = "new-secret-\(UUID().uuidString)"
+
+        XCTAssertEqual(refiner.apiKey, store.value(for: "llm-api-key"))
+        XCTAssertNil(defaults.string(forKey: "LLMRefiner_APIKey"))
+    }
+
+    func testClearingAPIKeyDeletesCredentialAndLegacyDefault() throws {
+        let suiteName = "VoiceInputAppTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let store = InMemoryCredentialStore()
+        let refiner = LLMRefiner(defaults: defaults, credentialStore: store)
+        refiner.apiKey = "secret-to-delete"
+        defaults.set("stale-secret", forKey: "LLMRefiner_APIKey")
+
+        refiner.apiKey = nil
+
+        XCTAssertNil(refiner.apiKey)
+        XCTAssertNil(store.value(for: "llm-api-key"))
+        XCTAssertNil(defaults.string(forKey: "LLMRefiner_APIKey"))
+    }
+
+    func testConfiguredStateUsesCredentialStoreAPIKey() throws {
+        let suiteName = "VoiceInputAppTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let store = InMemoryCredentialStore()
+        let refiner = LLMRefiner(defaults: defaults, credentialStore: store)
+
+        refiner.baseURL = "https://api.openai.com"
+        refiner.apiKey = "configured-secret"
+        refiner.model = "gpt-4o-mini"
+
+        XCTAssertTrue(refiner.isConfigured)
+        XCTAssertNil(defaults.string(forKey: "LLMRefiner_APIKey"))
+    }
+
     func testAPIBaseRootResolvesToChatCompletions() throws {
         let url = try LLMRefiner.chatCompletionsURL(
             baseURL: "https://api.openai.com"
@@ -74,7 +142,7 @@ final class LLMRefinerTests: XCTestCase {
             UserDefaults.standard.removePersistentDomain(forName: suiteName)
         }
 
-        let refiner = LLMRefiner(defaults: defaults)
+        let refiner = LLMRefiner(defaults: defaults, credentialStore: InMemoryCredentialStore())
         refiner.baseURL = baseURL
         refiner.apiKey = apiKey
         refiner.model = model
@@ -85,5 +153,25 @@ final class LLMRefinerTests: XCTestCase {
         XCTAssertTrue(result.contains("JSON"))
         XCTAssertFalse(result.contains("配森"))
         XCTAssertFalse(result.contains("杰森"))
+    }
+}
+
+private final class InMemoryCredentialStore: CredentialStore {
+    private var values: [String: String] = [:]
+
+    func readCredential(account: String) throws -> String? {
+        values[account]
+    }
+
+    func saveCredential(_ value: String, account: String) throws {
+        values[account] = value
+    }
+
+    func deleteCredential(account: String) throws {
+        values.removeValue(forKey: account)
+    }
+
+    func value(for account: String) -> String? {
+        values[account]
     }
 }

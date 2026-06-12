@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var asrEngineMenuItems: [NSMenuItem] = []
     private var llmToggleItem: NSMenuItem!
     private var refiningMenuItem: NSMenuItem!
+    private var workbenchItem: NSMenuItem!
     private var settingsItem: NSMenuItem!
 
     // MARK: - Subsystems
@@ -20,23 +21,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let audioRecorder = AudioRecorder()
     private let asrManager = ASRManager()
     private let textInjector = TextInjector()
-    private let llmRefiner = LLMRefiner()
+    private var llmRefiner: RepositoryBackedLLMRefiner!
     private let overlayController = OverlayWindowController()
-
-    private var currentEngine: ASREngine?
+    private var appEnvironment: AppEnvironment!
+    private var windowCoordinator: WindowCoordinator!
+    private var dictationOrchestrator: DictationOrchestrator!
 
     // MARK: - State
 
-    private enum AppState {
-        case idle
-        case recording
-        case refining
-        case injecting
-    }
-
-    private var state: AppState = .idle
-    private var transcriptionSession = TranscriptionSession()
-    private var finishTimeoutTask: Task<Void, Never>?
     private var permissionsResolved = false
     private var hasRecordingPermissions = false
     private var escEventMonitor: Any?
@@ -48,7 +40,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        do {
+            appEnvironment = AppEnvironment(container: try DependencyContainer.live())
+        } catch {
+            AppLogger.general.error("Failed to initialize app environment: \(error.localizedDescription)")
+            try? FileManager.default.createDirectory(
+                at: FileManager.default.temporaryDirectory,
+                withIntermediateDirectories: true
+            )
+            appEnvironment = AppEnvironment(container: try! DependencyContainer.inMemory())
+        }
+        windowCoordinator = WindowCoordinator(environment: appEnvironment)
+        llmRefiner = RepositoryBackedLLMRefiner(
+            providerRepository: appEnvironment.llmProviderRepository,
+            credentialStore: appEnvironment.credentialStore
+        )
+        setupDictationOrchestrator()
+
         setupStatusItem()
+        setupMainMenu()
         setupMenu()
 
         audioRecorder.delegate = self
@@ -61,13 +71,77 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         keyMonitor.stop()
         delayedPressTask?.cancel()
         audioRecorder.stop()
-        currentEngine?.cancel()
-        finishTimeoutTask?.cancel()
+        dictationOrchestrator.cancel()
         stopEscMonitor()
+    }
+
+    private func setupDictationOrchestrator() {
+        let styleSelector = SettingsBackedStyleSelector(
+            styleRepository: appEnvironment.styleRepository,
+            settingsRepository: appEnvironment.settingsRepository,
+            classifier: LLMApplicationStyleClassifier(refiner: llmRefiner)
+        )
+        dictationOrchestrator = DictationOrchestrator(
+            asrEngineFactory: asrManager,
+            audioRecorder: audioRecorder,
+            textPipeline: DefaultTextProcessingPipeline(
+                refiner: llmRefiner,
+                replacementRuleRepository: appEnvironment.replacementRuleRepository,
+                glossaryRepository: appEnvironment.glossaryRepository,
+                styleSelector: styleSelector
+            ),
+            textInjector: textInjector,
+            historyRepository: appEnvironment.historyRepository,
+            clock: appEnvironment.clock
+        )
+        dictationOrchestrator.onStateChange = { [weak self] state in
+            self?.handleDictationStateChange(state)
+        }
+        dictationOrchestrator.onTranscriptionUpdate = { [weak self] text, isRefining in
+            self?.overlayController.updateTranscription(text, isRefining: isRefining)
+        }
+        dictationOrchestrator.onProcessingStarted = { [weak self] text in
+            self?.overlayController.updateTranscription(text, isRefining: true)
+        }
+        dictationOrchestrator.onError = { [weak self] error in
+            self?.showRecognitionError(error)
+        }
+    }
+
+    private func handleDictationStateChange(_ state: DictationState) {
+        switch state {
+        case .idle:
+            stopEscMonitor()
+            overlayController.dismiss()
+            refiningMenuItem?.isHidden = true
+        case .recording:
+            startEscMonitor()
+            overlayController.show()
+            overlayController.updateTranscription("", isRefining: false)
+            refiningMenuItem?.isHidden = true
+        case .waitingForFinal:
+            if asrManager.effectiveSelectedEngineType == .qwen3 {
+                overlayController.updateTranscription("正在识别...", isRefining: true)
+            }
+        case .processing:
+            refiningMenuItem?.isHidden = false
+        case .injecting:
+            stopEscMonitor()
+            overlayController.dismiss()
+            refiningMenuItem?.isHidden = true
+        case .failed:
+            stopEscMonitor()
+            overlayController.dismiss()
+            refiningMenuItem?.isHidden = true
+        }
     }
 
     // MARK: - Status Item
@@ -80,14 +154,60 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 systemSymbolName: "mic.fill",
                 accessibilityDescription: "VoiceInput"
             )
+            image?.isTemplate = true
             button.image = image
             button.imagePosition = .imageOnly
-            // Subtle tint
-            button.contentTintColor = .controlAccentColor
+            // Keep the menu bar microphone white in both appearance modes.
+            button.contentTintColor = .white
         }
     }
 
     // MARK: - Menu
+
+    private func setupMainMenu() {
+        let mainMenu = NSMenu()
+
+        let applicationMenuItem = NSMenuItem()
+        let applicationMenu = NSMenu()
+        applicationMenu.addItem(
+            withTitle: "关于 VoiceInput",
+            action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+            keyEquivalent: ""
+        )
+        applicationMenu.addItem(.separator())
+        applicationMenu.addItem(
+            withTitle: "隐藏 VoiceInput",
+            action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h"
+        )
+        applicationMenu.addItem(
+            withTitle: "隐藏其他",
+            action: #selector(NSApplication.hideOtherApplications(_:)),
+            keyEquivalent: "h"
+        ).keyEquivalentModifierMask = [.command, .option]
+        applicationMenu.addItem(.separator())
+        applicationMenu.addItem(
+            withTitle: "退出 VoiceInput",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+        applicationMenuItem.submenu = applicationMenu
+        mainMenu.addItem(applicationMenuItem)
+
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: "编辑")
+        editMenu.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "重做", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "复制", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        NSApplication.shared.mainMenu = mainMenu
+    }
 
     private func setupMenu() {
         menu.autoenablesItems = false
@@ -120,6 +240,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setupASREngineMenu()
 
         menu.addItem(.separator())
+
+        // Workbench
+        workbenchItem = NSMenuItem(
+            title: "打开工作台...",
+            action: #selector(openWorkbench(_:)),
+            keyEquivalent: ""
+        )
+        workbenchItem.target = self
+        menu.addItem(workbenchItem)
 
         // Settings
         settingsItem = NSMenuItem(
@@ -205,7 +334,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func openSettings(_ sender: NSMenuItem) {
-        SettingsWindowController.shared.show(tab: .asr)
+        windowCoordinator.showSettings(tab: .asr)
+    }
+
+    @objc private func openWorkbench(_ sender: NSMenuItem) {
+        windowCoordinator.showMainWindow()
     }
 
     // MARK: - ASR Engine Menu
@@ -259,7 +392,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func setupKeyMonitor() {
         keyMonitor.onHotKeyPress = { [weak self] in
-            guard let self, case .idle = self.state else { return }
+            guard let self, self.dictationOrchestrator.state.isIdle else { return }
 
             // Delay recording start by longPressThreshold. If the user
             // releases before the threshold (short press), onShortPress
@@ -286,12 +419,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.delayedPressTask = nil
 
             // Toggle recording on short press.
-            switch self.state {
-            case .recording:
+            switch self.dictationOrchestrator.state {
+            case .recording, .waitingForFinal:
                 self.handleHotKeyRelease()
             case .idle:
                 self.handleHotKeyPress()
-            case .refining, .injecting:
+            case .processing, .injecting, .failed:
                 break
             }
         }
@@ -327,7 +460,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Hot Key Handling
 
     private func handleHotKeyPress() {
-        guard case .idle = state else { return }
+        guard dictationOrchestrator.state.isIdle else { return }
         refreshRecordingPermissionState()
         guard permissionsResolved, hasRecordingPermissions else {
             if permissionsResolved {
@@ -336,146 +469,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
 
-        transcriptionSession = TranscriptionSession()
-        finishTimeoutTask?.cancel()
-
-        let engineType = asrManager.effectiveSelectedEngineType
-        let engine = asrManager.makeEngine(type: engineType)
-        currentEngine = engine
-
-        engine.configure(locale: LanguageManager.shared.currentLanguage.locale)
-        engine.onTranscription = { [weak self] text, isFinal in
-            guard let self, case .recording = self.state else { return }
-            self.overlayController.updateTranscription(text, isRefining: false)
-            if let completedText = self.transcriptionSession.update(
-                text: text,
-                isFinal: isFinal
-            ) {
-                self.finishRecording(with: completedText)
-            }
-        }
-        engine.onError = { [weak self] error in
-            guard let self, case .recording = self.state else { return }
-            if let partialText = self.transcriptionSession.timeout() {
-                self.finishRecording(with: partialText)
-            } else {
-                self.handleRecognitionError(error)
-            }
-        }
-
         do {
-            try engine.start()
+            try dictationOrchestrator.start(configuration: currentDictationConfiguration())
         } catch {
-            handleRecognitionError(error)
-            return
-        }
-
-        do {
-            try audioRecorder.start()
-        } catch {
-            engine.cancel()
             if error is AudioRecorder.AudioRecorderError {
                 showRecordingPermissionsAlert()
             } else {
-                handleRecognitionError(error)
-            }
-            return
-        }
-
-        state = .recording
-
-        // Listen for ESC to cancel the recording.
-        escEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 {  // ESC
-                DispatchQueue.main.async {
-                    self?.cancelRecording()
-                }
+                showRecognitionError(error)
             }
         }
-
-        overlayController.show()
-        overlayController.updateTranscription("", isRefining: false)
-        refiningMenuItem.isHidden = true
     }
 
     private func handleHotKeyRelease() {
-        guard case .recording = state else {
-            return
-        }
-
-        audioRecorder.stop()
-        currentEngine?.endAudio()
-
-        // Qwen3 processes audio in batch after recording ends — show a
-        // processing indicator so the user knows inference is in progress.
-        if currentEngine is Qwen3ASREngine {
-            overlayController.updateTranscription("正在识别...", isRefining: true)
-        }
-
-        if let completedText = transcriptionSession.release() {
-            finishRecording(with: completedText)
-            return
-        }
-
-        finishTimeoutTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 15_000_000_000)
-            guard !Task.isCancelled,
-                  let self,
-                  case .recording = self.state else {
-                return
-            }
-            self.handleRecognitionError(ASREngineError.modelNotLoaded)
-        }
+        dictationOrchestrator.release()
     }
 
-    private func finishRecording(with recognizedText: String) {
-        stopEscMonitor()
-        finishTimeoutTask?.cancel()
-        finishTimeoutTask = nil
-        audioRecorder.stop()
-        currentEngine?.stop()
-
-        let finalText = recognizedText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !finalText.isEmpty else {
-            overlayController.dismiss()
-            state = .idle
-            return
-        }
-
-        if llmRefiner.isEnabled && llmRefiner.isConfigured {
-            // Show refining state
-            state = .refining
-            overlayController.updateTranscription(finalText, isRefining: true)
-            refiningMenuItem.isHidden = false
-
-            Task {
-                await refineText(finalText)
-            }
-        } else {
-            overlayController.dismiss()
-            state = .injecting
-            Task {
-                await textInjector.inject(finalText)
-                self.state = .idle
-            }
-        }
-    }
-
-    // MARK: - LLM Refinement
-
-    private func refineText(_ text: String) async {
-        let textToInject: String
-        do {
-            textToInject = try await llmRefiner.refine(text)
-        } catch {
-            textToInject = text
-        }
-
-        overlayController.dismiss()
-        refiningMenuItem.isHidden = true
-        state = .injecting
-        await textInjector.inject(textToInject)
-        state = .idle
+    private func currentDictationConfiguration() -> DictationConfiguration {
+        let engineType = asrManager.effectiveSelectedEngineType
+        let language = LanguageManager.shared.currentLanguage
+        return DictationConfiguration(
+            engineType: engineType,
+            locale: language.locale,
+            languageIdentifier: language.rawValue
+        )
     }
 
     // MARK: - Error Handling
@@ -490,14 +506,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 _ = await AudioRecorder.requestPermission()
             }
             let microphoneGranted = AudioRecorder.checkPermission() == .granted
-        permissionsResolved = true
-        hasRecordingPermissions = RecordingPermissionPolicy.hasRequiredPermissions(
-            engineType: .qwen3,
-            microphonePermission: microphoneGranted ? .granted : .denied,
-            speechPermission: .denied
-        )
-        return
-    }
+            permissionsResolved = true
+            hasRecordingPermissions = RecordingPermissionPolicy.hasRequiredPermissions(
+                engineType: .qwen3,
+                microphonePermission: microphoneGranted ? .granted : .denied,
+                speechPermission: .denied
+            )
+            return
+        }
 
         let micStatus = AudioRecorder.checkPermission()
         let speechStatus = SpeechRecognizer.checkPermission()
@@ -577,15 +593,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    private func handleRecognitionError(_ error: Error) {
-        stopEscMonitor()
-        finishTimeoutTask?.cancel()
-        finishTimeoutTask = nil
-        audioRecorder.stop()
-        currentEngine?.cancel()
-        overlayController.dismiss()
-        state = .idle
-
+    private func showRecognitionError(_ error: Error) {
         let alert = NSAlert()
         alert.messageText = "语音识别错误"
         alert.informativeText = error.localizedDescription
@@ -596,14 +604,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Cancel the current recording without injecting any text.
     private func cancelRecording() {
-        guard case .recording = state else { return }
+        dictationOrchestrator.cancel()
+    }
+
+    private func startEscMonitor() {
         stopEscMonitor()
-        finishTimeoutTask?.cancel()
-        finishTimeoutTask = nil
-        audioRecorder.stop()
-        currentEngine?.cancel()
-        overlayController.dismiss()
-        state = .idle
+        escEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 {  // ESC
+                DispatchQueue.main.async {
+                    self?.cancelRecording()
+                }
+            }
+        }
     }
 
     private func stopEscMonitor() {
@@ -618,7 +630,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
 extension AppDelegate: AudioRecorder.Delegate {
     func audioRecorder(_ recorder: AudioRecorder, didReceiveBuffer buffer: AVAudioPCMBuffer) {
-        currentEngine?.appendAudioBuffer(buffer)
+        dictationOrchestrator.appendAudioBuffer(buffer)
     }
 
     func audioRecorder(_ recorder: AudioRecorder, didUpdateRMS rms: Float) {

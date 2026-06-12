@@ -664,8 +664,14 @@ final class SettingsWindowController: NSWindowController {
         let apiKey = apiKeyField.stringValue
         let model = modelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        do {
+            try refiner.setAPIKey(apiKey.isEmpty ? nil : apiKey)
+        } catch {
+            setLLMStatus("API Key 保存失败：\(error.localizedDescription)", color: .systemRed)
+            return
+        }
+
         refiner.baseURL = baseURL.isEmpty ? nil : baseURL
-        refiner.apiKey = apiKey.isEmpty ? nil : apiKey
         refiner.model = model.isEmpty ? nil : model
 
         setLLMStatus("设置已保存。", color: .systemGreen)

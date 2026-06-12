@@ -1,0 +1,279 @@
+import SwiftUI
+
+struct NotesView: View {
+    @ObservedObject var viewModel: NotesViewModel
+    @State private var isSearchPresented = false
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 48) {
+                quickCapture
+                recentNotes
+            }
+            .padding(.horizontal, 42)
+            .padding(.vertical, 36)
+            .frame(maxWidth: 980)
+            .frame(maxWidth: .infinity)
+        }
+        .background(AppTheme.ColorToken.pageBackground)
+        .onAppear { viewModel.load() }
+    }
+
+    private var quickCapture: some View {
+        VStack(spacing: 24) {
+            Text("快速记录，随时回看")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(AppTheme.ColorToken.primaryText)
+
+            VStack(alignment: .leading, spacing: 18) {
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $viewModel.draftBodyMarkdown)
+                        .font(.system(size: 16))
+                        .scrollContentBackground(.hidden)
+                        .padding(.horizontal, 4)
+                        .frame(minHeight: 128)
+
+                    if viewModel.draftBodyMarkdown.isEmpty {
+                        Text(recordingPlaceholder)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(AppTheme.ColorToken.secondaryText.opacity(0.72))
+                            .padding(.top, 9)
+                            .padding(.leading, 9)
+                            .allowsHitTesting(false)
+                    }
+                }
+
+                HStack(alignment: .center) {
+                    Text("\(viewModel.characterCount) chars")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AppTheme.ColorToken.secondaryText)
+
+                    Spacer()
+
+                    if viewModel.recordingState != .idle || !viewModel.draftBodyMarkdown.isEmpty {
+                        Button("完成") {
+                            completeQuickCapture()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(viewModel.recordingState == .finishing)
+                    }
+                }
+            }
+            .padding(24)
+            .overlay(alignment: .topTrailing) {
+                recordButton
+                    .padding(20)
+            }
+            .background(AppTheme.ColorToken.panelBackground)
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(AppTheme.ColorToken.panelStroke)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: Color.black.opacity(0.08), radius: 14, y: 8)
+            .frame(maxWidth: 760)
+
+            ActionFeedbackView(
+                message: viewModel.lastActionMessage,
+                error: viewModel.lastError
+            )
+            .frame(maxWidth: 760)
+        }
+    }
+
+    private var recordButton: some View {
+        Button {
+            switch viewModel.recordingState {
+            case .idle:
+                Task { await viewModel.startRecording() }
+            case .recording:
+                viewModel.finishRecording()
+            case .finishing:
+                break
+            }
+        } label: {
+            Image(systemName: recordButtonIcon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 46, height: 46)
+                .background(AppTheme.ColorToken.primaryText)
+                .clipShape(Circle())
+                .shadow(color: Color.black.opacity(0.14), radius: 5, y: 3)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.recordingState == .finishing)
+        .help(viewModel.recordingState == .recording ? "完成录音" : "开始录音")
+    }
+
+    private var recentNotes: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                Text("最近记录")
+                    .font(.system(size: 18, weight: .semibold))
+                Spacer()
+                if isSearchPresented {
+                    TextField("搜索记录", text: $viewModel.searchQuery)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                        .onChange(of: viewModel.searchQuery) { _, query in
+                            viewModel.search(query)
+                        }
+                }
+                iconButton(
+                    systemName: "magnifyingglass",
+                    help: "搜索记录"
+                ) {
+                    isSearchPresented.toggle()
+                    if !isSearchPresented {
+                        viewModel.search("")
+                    }
+                }
+                iconButton(systemName: "list.bullet", help: "按列表显示") {}
+            }
+
+            Divider()
+
+            if viewModel.notes.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(AppTheme.ColorToken.secondaryText.opacity(0.55))
+                        .frame(width: 64, height: 64)
+                        .background(AppTheme.ColorToken.selectionBackground)
+                        .clipShape(Circle())
+                    Text("暂无记录")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(AppTheme.ColorToken.secondaryText)
+                }
+                .frame(maxWidth: .infinity, minHeight: 220)
+            } else {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 250), spacing: 14)],
+                    spacing: 14
+                ) {
+                    ForEach(viewModel.notes, id: \.id) { note in
+                        noteCard(note)
+                    }
+                }
+            }
+        }
+    }
+
+    private func noteCard(_ note: NoteRecord) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(note.title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppTheme.ColorToken.primaryText)
+                .lineLimit(1)
+            Text(note.bodyMarkdown)
+                .font(.system(size: 13))
+                .foregroundStyle(AppTheme.ColorToken.secondaryText)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, minHeight: 38, alignment: .topLeading)
+
+            HStack {
+                Text(note.updatedAt.formatted(.dateTime.month().day()))
+                Spacer()
+                Text(note.updatedAt.formatted(.dateTime.hour().minute()))
+                noteAction(systemName: "square.and.arrow.up", help: "导出 Markdown") {
+                    perform { _ = try viewModel.exportMarkdown(noteID: note.id) }
+                }
+                noteAction(systemName: "trash", help: "删除") {
+                    perform { try viewModel.deleteNote(id: note.id) }
+                }
+                .foregroundStyle(.red)
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(AppTheme.ColorToken.secondaryText)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            viewModel.selectedNoteID == note.id
+                ? AppTheme.ColorToken.selectionBackground
+                : AppTheme.ColorToken.panelBackground
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.Radius.card, style: .continuous)
+                .stroke(
+                    viewModel.selectedNoteID == note.id
+                        ? AppTheme.ColorToken.accent.opacity(0.36)
+                        : AppTheme.ColorToken.panelStroke
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.card, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            viewModel.selectNote(id: note.id)
+        }
+    }
+
+    private func iconButton(
+        systemName: String,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .frame(width: 34, height: 34)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(AppTheme.ColorToken.secondaryText)
+        .help(help)
+    }
+
+    private func noteAction(
+        systemName: String,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
+    private var recordingPlaceholder: String {
+        switch viewModel.recordingState {
+        case .idle:
+            return "你来说，我来记…"
+        case .recording:
+            return "正在聆听…"
+        case .finishing:
+            return "正在完成转录…"
+        }
+    }
+
+    private var recordButtonIcon: String {
+        switch viewModel.recordingState {
+        case .idle:
+            return "mic"
+        case .recording:
+            return "checkmark"
+        case .finishing:
+            return "ellipsis"
+        }
+    }
+
+    private func completeQuickCapture() {
+        if viewModel.recordingState == .recording {
+            viewModel.finishRecording()
+            return
+        }
+        guard viewModel.recordingState == .idle else { return }
+        perform { try viewModel.saveDraft() }
+    }
+
+    private func perform(_ action: () throws -> Void) {
+        do {
+            try action()
+        } catch {
+            viewModel.report(error: error)
+        }
+    }
+}
