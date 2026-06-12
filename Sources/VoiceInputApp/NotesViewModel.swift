@@ -41,7 +41,6 @@ final class NotesViewModel: ObservableObject {
         guard recordingState == .idle else { return }
         lastActionMessage = nil
         do {
-            let previousDraft = draftBodyMarkdown
             newDraft()
             try await transcriber.start()
             recordingState = .recording
