@@ -60,7 +60,7 @@ VoiceInput is not a big product, and it's not trying to replace every voice inpu
 | Notes | Markdown drafts, search, tags, save from history or file transcription |
 | Customizable shortcuts | Record any key, adjust long-press threshold, configure short-press behavior |
 | Settings center | General, system, data and privacy settings, including import/export and reset |
-| Menu-bar only | `LSUIElement`, no Dock icon |
+| Regular macOS app + menu-bar controls | Managed through Dock, `Command+Tab`, and Force Quit while keeping the menu-bar dictation entry |
 
 ## Quick Start
 

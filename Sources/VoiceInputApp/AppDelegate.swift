@@ -69,10 +69,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Task {
             await resolveRecordingPermissions()
         }
+
+        if AppPresentationPolicy.opensWorkbenchOnLaunch {
+            windowCoordinator.showMainWindow()
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationShouldHandleReopen(
+        _ sender: NSApplication,
+        hasVisibleWindows flag: Bool
+    ) -> Bool {
+        guard AppPresentationPolicy.restoresWorkbenchOnReopen else {
+            return true
+        }
+        windowCoordinator.showMainWindow()
+        return false
     }
 
     func applicationWillTerminate(_ notification: Notification) {

@@ -7,6 +7,11 @@ final class AppPresentationPolicyTests: XCTestCase {
         XCTAssertEqual(AppPresentationPolicy.activationPolicy, .regular)
     }
 
+    func testRegularAppOpensAndRestoresWorkbenchWindow() {
+        XCTAssertTrue(AppPresentationPolicy.opensWorkbenchOnLaunch)
+        XCTAssertTrue(AppPresentationPolicy.restoresWorkbenchOnReopen)
+    }
+
     func testInfoPlistDoesNotDeclareAgentOnlyApp() throws {
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile

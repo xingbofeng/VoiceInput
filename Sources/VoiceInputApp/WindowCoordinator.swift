@@ -15,6 +15,7 @@ final class WindowCoordinator {
         }
         guard let window = mainWindowController?.window else { return }
         NSApp.activate(ignoringOtherApps: true)
+        WindowPlacementPolicy.placeOnVisibleScreenIfNeeded(window)
         window.makeKeyAndOrderFront(nil)
     }
 

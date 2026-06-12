@@ -15,12 +15,16 @@
 - **Capability tag**: A user-facing and filterable ASR Provider label such as local, streaming, cloud, multilingual, or punctuation.
 - **Injection**: Temporarily placing text on the pasteboard and posting Command-V to the focused application.
 - **HUD**: The bottom-centered non-activating capsule shown during recording and refinement.
+- **Workbench window**: The regular macOS application window shown in Dock, `Command+Tab`, and Force Quit while the menu-bar dictation controls remain available.
+- **Notes recording flow**: The notes page flow that starts recording, streams transcription into the editor, finishes, and saves a note.
 
 ## Module Boundaries
 
 | Module | Owns | Must not own |
 | --- | --- | --- |
 | `AppDelegate` | Menu construction, permissions prompts, hotkey entry, HUD callback wiring | Audio math, URL parsing, pasteboard serialization, dictation state machine |
+| `AppPresentationPolicy` | App activation policy and main-window restore rules | Window layout or menu construction |
+| `WindowPlacementPolicy` | Pure visible-screen centering and recovery rules for the workbench window | SwiftUI content or app lifecycle |
 | `KeyMonitor` | CGEvent tap and right Command transitions | Recording lifecycle |
 | `AudioRecorder` | AVAudioEngine and RMS extraction | Speech requests |
 | `SpeechRecognizer` | Speech request/task and callbacks | Audio engine |
@@ -36,7 +40,8 @@
 | `SettingsViewModel` | SwiftUI settings state, persisted app settings, shortcut preferences, device/permission snapshots, data actions | Hotkey event capture, real permission requests |
 | `FileTranscriptionViewModel` | File import validation, transcription job queue state, progress/cancel/retry, export, save-as-note | Concrete ASR provider internals, note editing UI |
 | `FileTranscriptionWorking` | File-to-text worker contract for mock and real ASR implementations | Job persistence or SwiftUI state |
-| `NotesViewModel` | Note CRUD, Markdown draft state, search, history/file-transcription import, tag normalization, Markdown export | File transcription queue execution |
+| `NotesViewModel` | Note CRUD, notes recording flow state, Markdown draft state, search, history/file-transcription import, tag normalization, Markdown export | File transcription queue execution, audio capture implementation |
+| `NotesRecordingService` | AudioRecorder-to-ASR transcription bridge for notes recording | Note persistence or SwiftUI layout |
 | `OverlayWindowController` | NSPanel visibility, sizing, animation | Recognition state |
 | `WaveformModel` | Envelope and bar heights | Drawing |
 | `TextInjector` | Input source switching, paste, clipboard restoration | Recognition or LLM calls |

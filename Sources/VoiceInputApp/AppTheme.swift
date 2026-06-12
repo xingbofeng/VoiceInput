@@ -29,8 +29,8 @@ enum AppTheme {
         static let accent = Color(red: 0.08, green: 0.44, blue: 0.36)
         static let progressTrack = Color(nsColor: .separatorColor).opacity(0.35)
         static var accentDark: Color { Color(red: 0.16, green: 0.56, blue: 0.48) }
-        static let sidebarBackground = Color(nsColor: .underPageBackgroundColor)
-        static let sidebarText = Color(nsColor: .labelColor).opacity(0.60)
+        static let sidebarBackground = Color(nsColor: .windowBackgroundColor)
+        static let sidebarText = Color(nsColor: .labelColor).opacity(0.82)
         static let selectionBackground = accent.opacity(0.14)
         static let selectionBorder = accent.opacity(0.32)
     }

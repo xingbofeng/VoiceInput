@@ -54,7 +54,18 @@ final class MainWindowController: NSWindowController {
         window.title = "VoiceInput"
         window.contentViewController = hostingController
         window.isReleasedWhenClosed = false
-        window.center()
+        if let visibleFrame = NSScreen.main?.visibleFrame {
+            window.setFrame(
+                WindowPlacementPolicy.centeredFrame(
+                    windowSize: window.frame.size,
+                    visibleFrame: visibleFrame
+                ),
+                display: true,
+                animate: false
+            )
+        } else {
+            window.center()
+        }
         super.init(window: window)
     }
 
