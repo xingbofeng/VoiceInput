@@ -4,6 +4,15 @@ import Foundation
 enum ASREngineType: String, CaseIterable, Equatable {
     case apple = "Apple Speech"
     case qwen3 = "Qwen3-ASR"
+
+    var displayName: String {
+        switch self {
+        case .apple:
+            return "系统自带"
+        case .qwen3:
+            return "Qwen3-ASR"
+        }
+    }
 }
 
 protocol ASREngine: AnyObject {

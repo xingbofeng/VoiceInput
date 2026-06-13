@@ -347,6 +347,11 @@ final class GlossaryViewModel: ObservableObject {
         lastActionMessage = nil
     }
 
+    func clearFeedback() {
+        lastError = nil
+        lastActionMessage = nil
+    }
+
     private func importPortableData(_ data: PortableGlossaryData) throws -> GlossaryImportSummary {
         var created = 0
         var updated = 0

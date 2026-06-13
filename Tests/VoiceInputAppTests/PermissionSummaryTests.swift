@@ -18,14 +18,14 @@ final class PermissionSummaryTests: XCTestCase {
                 engineType: .apple,
                 speechPermission: .denied
             ),
-            "❌ 未授予"
+            "未授权"
         )
         XCTAssertEqual(
             PermissionSummary.speechRecognitionStatus(
                 engineType: .apple,
                 speechPermission: .granted
             ),
-            "✅ 已授予"
+            "已授权"
         )
     }
 

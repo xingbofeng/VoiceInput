@@ -1,83 +1,179 @@
 <div align="center">
-  <img src="docs/assets/voiceinput-logo.png" alt="VoiceInput logo" width="132">
+  <img src="docs/assets/voiceinput-logo.png" alt="VoiceInput logo" width="128">
 
   <img src="docs/assets/voiceinput-hero.svg" alt="VoiceInput - Hold. Speak. Done." width="100%">
 
   <h1>VoiceInput</h1>
-  <p><strong>Hold Right Command, speak, release — text appears where your cursor is.</strong></p>
-  <p>A native, restrained, Chinese-first macOS menu-bar voice input tool.</p>
+  <p><strong>Hold a shortcut, speak, release — your words appear right where the cursor is.</strong></p>
+  <p>A lightweight macOS voice input tool for thoughts, notes, code explanations, and AI conversations.</p>
   <p><sub><a href="README.md">中文</a></sub></p>
 
   <p>
     <img src="https://img.shields.io/badge/macOS-14%2B-111827?style=flat-square&logo=apple&logoColor=white" alt="macOS 14+">
-    <img src="https://img.shields.io/badge/Swift-5.9%2B-F05138?style=flat-square&logo=swift&logoColor=white" alt="Swift 5.9+">
-    <img src="https://img.shields.io/badge/UI-AppKit-6366F1?style=flat-square" alt="AppKit">
-    <img src="https://img.shields.io/badge/tests-swift%20test-10B981?style=flat-square" alt="swift test">
     <a href="https://github.com/xingbofeng/VoiceInput/releases/latest"><img src="https://img.shields.io/github/v/release/xingbofeng/VoiceInput?style=flat-square&label=release" alt="Latest release"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-open%20source-10B981?style=flat-square" alt="License"></a>
   </p>
   <p>
     🌐 <a href="https://xingbofeng.github.io/VoiceInput/">Website</a>
+    &nbsp;·&nbsp;
+    ⬇️ <a href="https://github.com/xingbofeng/VoiceInput/releases/latest">Download</a>
     &nbsp;·&nbsp;
     🎬 <a href="docs/voiceinput-demo-land.mp4">Intro Video</a>
   </p>
 </div>
 
-## Why VoiceInput
+## What Is VoiceInput?
 
-After vibe coding, writing code is no longer the same.
+VoiceInput is a voice keyboard, not a voice assistant.
 
-It used to be mostly about typing. Now it's about describing intent, providing context, explaining problems, and steering agents. Speaking these things comes naturally — but typing them out, word by word, is slow.
+It does not take over your window or force you to move text into a separate editor. Put the cursor where you want text to appear, hold the shortcut, speak, and release. VoiceInput writes the result back into the app you were already using.
 
-I tried existing tools. Some are feature-rich, some are smart, some support local or cloud models. But what I actually wanted was simpler: a "voice keyboard," not a voice assistant.
+It is designed for people who want speech to become text without breaking flow:
 
-VoiceInput is my answer to that small problem.
+- **Faster input**: Say the thoughts you already have instead of typing every word.
+- **Less interruption**: No focus stealing, no large modal workflow, no extra copy-paste step.
+- **More reliable results**: Dictation, correction, glossary, styles, notes, and history all support the same goal: getting useful text into the right place.
 
-**It does exactly three things:**
+## Who It Is For
 
-- **Stays light.** Hold Right Command, speak, release — text appears right where your cursor is. It never steals focus, never interrupts your flow, and never forces you into complex configuration.
-- **Gets technical terms right.** Optional LLM refinement fixes only obvious misrecognitions — "配森" → Python, "杰森" → JSON, "Type Script" → TypeScript. No polishing, no rewriting, no second-guessing the user.
-- **Keeps you in flow.** When writing code feels more and more like describing ideas to an AI, the input method should feel just as natural.
+VoiceInput is especially useful if you:
 
-VoiceInput is not a big product, and it's not trying to replace every voice input tool out there. It's just the input layer I wanted for my own vibe coding workflow.
+- Talk to ChatGPT, Claude, Codex, Cursor, or other AI tools and often need to describe intent, context, or revision requests.
+- Write code and frequently explain bugs, add notes, draft commit messages, or document investigation steps.
+- Capture meeting notes, ideas, tasks, long replies, or article drafts.
+- Speak mixed Chinese and English, where technical terms and product names are easy to misrecognize.
+- Prefer quiet, native macOS utilities that live in the menu bar and stay out of the way.
+
+## Core Experience
+
+### Hold To Speak, Release To Insert
+
+VoiceInput works like a keyboard layer. Hold your dictation shortcut, speak, and release. A small transcription overlay appears while you are speaking, then the final text is inserted into the current cursor position.
+
+There is no need to switch apps or manually copy text back.
+
+### Live Transcription
+
+While you speak, VoiceInput shows recognized text in real time so you can stay oriented. It works for short commands, long explanations, Chinese, English, and mixed Chinese-English speech.
+
+VoiceInput includes the system speech recognizer and also supports local Qwen3-ASR models. The system model works out of the box; local models are useful when you prefer an offline path.
+
+### Optional LLM Correction
+
+Speech recognition can struggle with technical terms such as Python, JSON, TypeScript, framework names, or product names. VoiceInput can run a conservative correction pass through your own OpenAI-compatible provider after dictation finishes.
+
+The correction pass is intentionally restrained. It is meant to fix obvious recognition mistakes, not rewrite your tone or polish your content.
+
+### Workbench
+
+VoiceInput also includes a workbench for the parts of voice input that deserve a proper home:
+
+| Page | What You Can Do |
+| --- | --- |
+| Home | Review stats, daily goals, and dictation history; copy or delete entries |
+| Glossary | Manage frequent terms, names, technical words, and replacement rules |
+| Styles | Choose output styles such as original, formal, email, or coding notes |
+| File Transcription | Import audio or video files, transcribe them, export txt/md/srt, or save as notes |
+| Notes | Record voice notes, edit Markdown, search, and review recent notes |
+| Settings | Manage input devices, shortcuts, models, permissions, privacy, and data |
+| Help | Find permission guidance, version information, and project links |
 
 ## Highlights
 
-| Capability | Implementation |
-| --- | --- |
-| Push-to-talk | CGEvent tap listens only to and suppresses Right Command; Left Command stays native |
-| Chinese out of the box | Default `zh-CN`, with English, Simplified Chinese, Traditional Chinese, Japanese, Korean |
-| Real-time transcription | Apple Speech Recognition streaming partial results |
-| Living waveform | Real microphone RMS driven, with attack/release envelope and subtle random jitter |
-| Non-intrusive HUD | `NSPanel` + `.hudWindow`, never steals focus or interrupts your current app |
-| Reliable injection | CJK input methods temporarily switched to ABC/US, Command-V pasted, then restored |
-| Full clipboard restore | Saves and restores all pasteboard items and types, not just plain text |
-| Optional LLM refinement | Supports OpenAI-compatible API, targeting Chinese-English technical term misrecognitions |
-| Multi-engine switching | Pluggable ASR architecture with Apple Speech and Qwen3-ASR |
-| Workbench | Home, glossary, styles, file transcription, notes, dictation models, settings, help |
-| Glossary and replacements | Terms, aliases, JSON/CSV import/export, before/after LLM replacement rules |
-| Style system | Original, formal, casual, energetic, coding, email styles, plus app-based auto selection |
-| File transcription | Audio/video queue, progress, cancel, retry, txt/md/srt export, save as note |
-| Notes | Markdown drafts, search, tags, save from history or file transcription |
-| Customizable shortcuts | Record any key, adjust long-press threshold, configure short-press behavior |
-| Settings center | General, system, data and privacy settings, including import/export and reset |
-| Regular macOS app + menu-bar controls | Managed through Dock, `Command+Tab`, and Force Quit while keeping the menu-bar dictation entry |
+- **Global dictation**: Works in any editable text field, not only inside VoiceInput.
+- **Non-intrusive overlay**: Shows live text and voice activity without taking focus.
+- **System and local models**: Use the built-in system recognizer or a local Qwen3-ASR model.
+- **Input device selection**: Choose your microphone; long device names are handled gracefully.
+- **Shortcut recording**: Record the key you want to use and configure short-press behavior.
+- **OpenAI-compatible providers**: Add, test, edit, and delete providers; API keys are stored in macOS Keychain.
+- **Glossary and replacements**: Teach VoiceInput your own terms, aliases, and fixed transformations.
+- **History and notes**: Search, copy, edit, and reuse previous dictation results.
+- **File transcription**: Turn recordings, videos, or meeting audio into text.
+- **Local-first data**: History, glossary, settings, notes, and jobs live locally; LLM correction is opt-in.
 
 ## Quick Start
 
 ### Download & Install
 
-Download `VoiceInput-1.1.0-macOS.dmg` from [GitHub Releases](https://github.com/xingbofeng/VoiceInput/releases/latest):
+Download the latest version from [GitHub Releases](https://github.com/xingbofeng/VoiceInput/releases/latest):
 
-1. Open the DMG file
+1. Open `VoiceInput-1.1.0-macOS.dmg`
 2. Drag `VoiceInputApp` into the `Applications` folder
-3. First launch: **Control-click the app** → select **"Open"** (see below)
+3. On first launch, if macOS cannot verify the app, Control-click the app and choose **Open**
 
 ### Requirements
 
 - macOS 14 Sonoma or later
-- A Mac keyboard with left and right Command keys
+- A Mac with a microphone
 
-### Build From Source
+### First Permissions
+
+VoiceInput needs a few macOS permissions:
+
+| Permission | Why It Is Needed | Where |
+| --- | --- | --- |
+| Accessibility | Listen for the global shortcut and insert text into the current app | System Settings -> Privacy & Security -> Accessibility |
+| Microphone | Record your voice | System Settings -> Privacy & Security -> Microphone |
+| Speech Recognition | Use the system speech recognizer | System Settings -> Privacy & Security -> Speech Recognition |
+
+If you use a local Qwen3-ASR model, Speech Recognition permission is not required. Microphone permission is still required.
+
+If the shortcut does not respond after granting permissions, quit and reopen VoiceInput.
+
+## How To Use
+
+### Dictation
+
+1. Place your cursor in any text field.
+2. Hold the dictation shortcut.
+3. Speak. The overlay shows live recognition.
+4. Release the shortcut. The final text is inserted at the cursor.
+
+### Voice Notes
+
+Open the workbench and go to **Notes**. Click the record button to start a quick note. VoiceInput transcribes as you speak, then lets you edit and review the note afterward.
+
+### File Transcription
+
+Open **File Transcription**, select an audio or video file, and let VoiceInput process it. Completed jobs can be copied, exported, or saved as notes.
+
+### Improve Names And Terms
+
+Use **Glossary** to add project names, people names, product names, technical terms, or fixed replacements. These entries help future dictation and correction feel closer to your own vocabulary.
+
+### Enable LLM Correction
+
+Open **Settings -> Models**, add an OpenAI-compatible provider, fill in Base URL, Model, and API Key, then test the connection. Once it works, enable **LLM Correction** in the same settings page.
+
+API keys are stored in macOS Keychain.
+
+## Privacy
+
+VoiceInput is local-first by default.
+
+- History, glossary, notes, transcription jobs, and non-secret settings are stored locally.
+- API keys are stored in macOS Keychain.
+- Apple Speech may process audio according to macOS system behavior.
+- Local Qwen3-ASR runs on-device after the model is downloaded.
+- LLM correction is disabled by default. When enabled, only recognized text is sent to your configured API provider.
+- VoiceInput does not automatically upload your audio, notes, history, or clipboard content.
+
+See [Privacy](docs/PRIVACY.md) for more details.
+
+## FAQ
+
+| Question | Answer |
+| --- | --- |
+| The shortcut does nothing | Check Accessibility permission, then quit and reopen VoiceInput |
+| The overlay appears but no text shows up | Check Microphone, Speech Recognition, or the selected model state |
+| LLM correction does not run | Make sure it is enabled in Settings and the default provider passes the connection test |
+| Why is my API key hidden? | That is expected. Use the reveal button while editing if you need to inspect it |
+| Can I use it offline? | Download and select a local Qwen3-ASR model |
+| Can deleted history or notes be restored? | Deletion is local and immediate, so please confirm before deleting |
+
+## Run From Source
+
+If you want to build the app yourself:
 
 ```bash
 git clone https://github.com/xingbofeng/VoiceInput.git
@@ -85,242 +181,13 @@ cd VoiceInput
 make run
 ```
 
-Release builds are Universal Binaries supporting both Apple Silicon and Intel Macs.
-
-Install to `/Applications`:
+Common commands:
 
 ```bash
+make build
 make install
-open /Applications/VoiceInputApp.app
+swift test
 ```
-
-Ad-hoc signing is the default. To use a Developer ID certificate:
-
-```bash
-make CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" build
-```
-
-## First Launch
-
-### Permissions
-
-VoiceInput requires three system permissions:
-
-| Permission | Purpose | Path |
-| --- | --- | --- |
-| Accessibility | Global Right Command monitoring, simulated Command-V | System Settings → Privacy & Security → Accessibility |
-| Microphone | Capture live audio | System Settings → Privacy & Security → Microphone |
-| Speech Recognition | Apple Speech transcription | System Settings → Privacy & Security → Speech Recognition |
-
-If Right Command doesn't respond after granting permissions, quit and reopen VoiceInput. A microphone icon should appear in your menu bar.
-
-### Gatekeeper Warning
-
-VoiceInput is ad-hoc signed (not notarized). On first launch, macOS will show **"Apple cannot verify that this app is free from malware"**. This is normal — VoiceInput is fully open source.
-
-To bypass (choose one):
-
-**Method 1**: In Finder, **Control-click the app** → select **"Open"** → click **"Open"** in the dialog.
-
-**Method 2**: Run in Terminal:
-
-```bash
-sudo xattr -cr /Applications/VoiceInputApp.app
-```
-
-After doing either once, the app will launch normally on subsequent opens.
-
-## Usage
-
-### Dictation
-
-1. Place your cursor in any editable text field.
-2. Hold Right `Command` — the capsule appears at the bottom of the screen.
-3. Speak. The capsule shows recognition results in real time, and the waveform responds to your voice volume.
-4. Release Right `Command`. The final text is automatically pasted into the current text field.
-
-### Language
-
-Open the menu bar icon → `语言 / Language`:
-
-- English (`en-US`)
-- 简体中文 (`zh-CN`, default)
-- 繁體中文 (`zh-TW`)
-- 日本語 (`ja-JP`)
-- 한국어 (`ko-KR`)
-
-Your selection is persisted in `UserDefaults`.
-
-### ASR Engine
-
-VoiceInput supports pluggable speech recognition engines. Switch from the menu bar `ASR Engine` submenu, or use the workbench `Dictation Models` page to inspect capability tags, default model, and fallback behavior:
-
-| Engine | Description |
-| --- | --- |
-| Apple Speech | Built-in, works out of the box, requires Speech Recognition permission |
-| Qwen3-ASR | Experimental engine, only requires Microphone permission (in development) |
-
-Qwen3-ASR cannot be selected until a local model is configured. Open the workbench → `Dictation Models` and download the local model; VoiceInput shows download progress and saves the model under the local Application Support directory. Qwen3-ASR becomes selectable after the download completes. When Qwen3-ASR is selected, Apple Speech Recognition permission is not requested.
-
-### Shortcut Settings
-
-Open the menu bar icon → `设置...` → `快捷键` to:
-
-- **Record shortcut**: Click "Record" and press any key (supports modifier keys and regular keys)
-- **Long-press threshold**: Adjust the duration that distinguishes short press from long press (default 500ms)
-- **Short-press behavior**: Choose "No action" or "Toggle continuous listening" on short press
-
-Changes take effect immediately — no restart required.
-
-## Workbench
-
-Open the menu bar icon → `打开工作台...` to use the full workbench:
-
-| Page | Purpose |
-| --- | --- |
-| Home | Stats, goal progress, history details, copy, delete, reprocess |
-| Glossary | Terms, aliases, replacement rules, JSON/CSV import and export |
-| Styles | Prompt editing, default style, app rules, and automatic selection through the global model |
-| File Transcription | Drag audio/video files, queue transcription, export txt/md/srt, save as note |
-| Notes | Markdown editing, search, tags, export |
-| Settings | Unified OpenAI-compatible and dictation models, input devices, shortcuts, permissions, privacy, and data |
-| Help | Version, permission hints, project links |
-
-## LLM Refinement
-
-Apple Speech is fast, but technical terms in mixed Chinese-English speech can still become phonetic homophones. VoiceInput can run a single, extremely conservative correction pass through an OpenAI-compatible API before pasting:
-
-```text
-配森  → Python
-杰森  → JSON
-```
-
-It will never polish, rewrite, or compress your content. When the model is uncertain, the system prompt instructs it to return the input unchanged.
-
-Open the workbench → `LLM Provider`, or use the legacy settings entry, and fill in:
-
-| Field | Example |
-| --- | --- |
-| API Base URL | `https://tokenhub.tencentmaas.com/v1` |
-| API Key | Your service key |
-| Model | `deepseek-v4-flash-202605` |
-
-The Base URL handles the following forms without duplicating `/v1`:
-
-```text
-https://api.example.com
-https://api.example.com/v1
-https://api.example.com/v1/chat/completions
-```
-
-Click test connection to verify the service, and refresh models to record available models and latency. API keys are stored only in macOS Keychain; plaintext keys written to `UserDefaults` by older builds are migrated and removed when configuration loads. Enable refinement from the menu bar `LLM 纠错` item. After recording, the HUD shows `Refining...`; once the model returns, the corrected text is injected. On network failure, it falls back to the raw transcription automatically.
-
-## How It Works
-
-```mermaid
-flowchart LR
-    HOTKEY["Hold Right Command"] --> TAP["CGEvent tap"]
-    TAP --> AUDIO["AVAudioEngine"]
-    AUDIO --> RMS["RMS envelope"]
-    RMS --> HUD["Live HUD waveform"]
-    AUDIO --> SPEECH["Apple Speech"]
-    SPEECH --> PARTIAL["Streaming text"]
-    PARTIAL --> HUD
-    HOTKEY2["Release Right Command"] --> FINAL["Final result or bounded timeout"]
-    FINAL --> PIPE["TextProcessingPipeline"]
-    PIPE --> RULE1["before LLM replacements"]
-    RULE1 --> PROMPT["PromptBuilder: style + glossary"]
-    PROMPT --> CHECK{"LLM enabled?"}
-    CHECK -- No --> RULE2["after LLM replacements"]
-    CHECK -- Yes --> REFINE["OpenAI-compatible refine"]
-    REFINE --> RULE2
-    RULE2 --> HIST["History save"]
-    HIST --> PASTE["Input source guard + Command-V"]
-    PASTE --> RESTORE["Restore input source + clipboard"]
-```
-
-### Module Map
-
-```text
-AppDelegate
-├── KeyMonitor                 Right Command event tap and suppression
-├── AudioRecorder              AVAudioEngine capture and RMS
-├── ASRManager                 ASR engine selection and factory
-│   ├── ASREngine              Pluggable engine protocol
-│   ├── SpeechRecognizer       Apple Speech implementation
-│   ├── Qwen3ASREngine         Qwen3-ASR implementation
-│   └── AudioPreprocessor      Fbank feature extraction (Accelerate)
-├── DictationOrchestrator      ASR final/partial fallback, pipeline, injection, history
-├── TextProcessingPipeline     Replacement rules, PromptBuilder, conservative LLM fallback
-├── WindowCoordinator          Workbench window lifecycle
-├── MainShellView              SwiftUI workbench navigation
-├── ShortcutManager            Hotkey config, threshold, short-press behavior
-├── OverlayWindowController    Non-activating capsule HUD
-├── TextInjector               Input source, paste, clipboard restore
-├── LLMRefiner                 OpenAI-compatible conservative correction
-├── Repositories               SQLite history/glossary/style/provider/jobs/notes/settings
-├── KeychainCredentialStore    API key persistence
-└── LanguageManager            Locale selection and persistence
-```
-
-## Privacy
-
-VoiceInput does not include analytics or telemetry.
-
-- Audio is captured locally by `AVAudioEngine`.
-- Speech recognition provider is user-selectable. Apple Speech may process audio over the network; local Qwen3-ASR runs on-device after the model is downloaded.
-- LLM refinement is disabled unless you enable and configure it.
-- When LLM refinement is enabled, only the recognized text is sent to your configured API endpoint.
-- Glossary, history, jobs, notes and non-secret settings live in local SQLite. API keys live in Keychain.
-- Clipboard content is held in memory only for the duration of text injection, then restored.
-
-## Development
-
-```bash
-make build      # Release app bundle + signature verification
-make run        # Build and launch one instance
-make install    # Install to /Applications
-make release    # Signed app bundle + zip + SHA-256
-make debug      # Strict debug compilation
-make clean      # Remove SwiftPM products and app bundle
-swift test      # Unit test suite
-```
-
-To run the live LLM integration test:
-
-```bash
-VOICEINPUT_TEST_BASE_URL="https://api.example.com/v1" \
-VOICEINPUT_TEST_API_KEY="your-key" \
-VOICEINPUT_TEST_MODEL="your-model" \
-swift test --filter LLMRefinerTests/testConfiguredOpenAICompatibleServiceRefinesMixedLanguageText
-```
-
-Tests cover language defaults, LLM URL normalization and response parsing, full clipboard snapshots, Right Command state transitions, CJK input source classification, RMS, waveform envelopes, HUD sizing, and transcription completion races.
-
-## Troubleshooting
-
-| Symptom | Check |
-| --- | --- |
-| Right Command has no effect | Verify Accessibility permission, quit and reopen the app |
-| Left Command is affected | Make sure you're running the latest installed version with no duplicate VoiceInput processes |
-| Capsule appears but no text | Check Microphone, Speech Recognition permissions, and network |
-| Chinese input method swallows paste | Ensure an ABC or US keyboard layout exists in System Settings |
-| Test returns 404 | Base URL can be an API root path or `/v1` — don't use other service pages |
-| LLM timeout | VoiceInput falls back to raw recognition text; your input is never lost |
-| Permission changes don't take effect | `pkill -x VoiceInputApp` then reopen the app |
-
-Check for multiple running instances:
-
-```bash
-pgrep -alf VoiceInputApp
-```
-
-## Design Principles
-
-- Input first: No UI element may steal focus from the current text field.
-- Conservative first: LLM may only fix obvious errors, never rewrite on the user's behalf.
-- State recoverable: Input method and clipboard must return to their exact prior state after injection.
-- Evidence first: Build, test, signing, and real API calls are verified separately. "It compiles" does not mean "it works."
 
 ## Inspiration
 

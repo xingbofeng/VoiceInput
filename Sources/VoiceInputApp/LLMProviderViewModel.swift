@@ -49,13 +49,8 @@ final class LLMProviderViewModel: ObservableObject {
         let existing = try environment.llmProviderRepository.provider(id: providerID)
         let keyRef = existing?.apiKeyRef ?? "llm-provider-\(providerID)"
         let storedKey = try environment.credentialStore.readCredential(account: keyRef)
-        let trimmedKey: String
         let rawKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        if isMaskedAPIKey(providerID: id, text: rawKey) {
-            trimmedKey = ""  // masked → keep existing stored key
-        } else {
-            trimmedKey = rawKey
-        }
+        let trimmedKey = isMaskedAPIKey(providerID: id, text: rawKey) ? "" : rawKey
         var missingFields: [String] = []
         if trimmedName.isEmpty { missingFields.append("名称") }
         if trimmedURL.isEmpty { missingFields.append("Base URL") }
@@ -105,17 +100,16 @@ final class LLMProviderViewModel: ObservableObject {
     }
 
     func APIKeyForEditing(providerID: String?) -> String {
+        hasStoredAPIKey(providerID: providerID) ? String(repeating: "•", count: 12) : ""
+    }
+
+    func storedAPIKeyForEditing(providerID: String?) -> String {
         guard let providerID,
               let provider = try? environment.llmProviderRepository.provider(id: providerID),
-              let credential = try? environment.credentialStore.readCredential(account: provider.apiKeyRef),
-              !credential.isEmpty else {
+              let credential = try? environment.credentialStore.readCredential(account: provider.apiKeyRef) else {
             return ""
         }
-        let masked = String(repeating: "•", count: min(credential.count, 8))
-        if credential.count > 4 {
-            return "\(String(credential.prefix(3)))\(masked)\(String(credential.suffix(4)))"
-        }
-        return masked
+        return credential
     }
 
     /// Returns `true` when the text matches the stored masked representation,
@@ -163,11 +157,7 @@ final class LLMProviderViewModel: ObservableObject {
             let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
             let normalizedURL = try OpenAICompatibleClient.normalizedBaseURL(baseURL)
             let trimmedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
-            var resolvedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-            if resolvedKey.isEmpty, let providerID,
-               let provider = try environment.llmProviderRepository.provider(id: providerID) {
-                resolvedKey = try environment.credentialStore.readCredential(account: provider.apiKeyRef) ?? ""
-            }
+            let resolvedKey = try resolvedAPIKey(providerID: providerID, text: apiKey)
             var missingFields: [String] = []
             if trimmedName.isEmpty { missingFields.append("名称") }
             if trimmedModel.isEmpty { missingFields.append("Model") }
@@ -316,11 +306,26 @@ final class LLMProviderViewModel: ObservableObject {
         lastActionMessage = nil
     }
 
+    func clearFeedback() {
+        lastError = nil
+        lastActionMessage = nil
+    }
+
     private func requireProvider(id: String) throws -> LLMProviderRecord {
         if let provider = try environment.llmProviderRepository.provider(id: id) {
             return provider
         }
         throw LLMProviderViewModelError.providerNotFound
+    }
+
+    private func resolvedAPIKey(providerID: String?, text: String) throws -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let providerID,
+              (trimmed.isEmpty || isMaskedAPIKey(providerID: providerID, text: trimmed)),
+              let provider = try environment.llmProviderRepository.provider(id: providerID) else {
+            return trimmed
+        }
+        return try environment.credentialStore.readCredential(account: provider.apiKeyRef) ?? ""
     }
 
     private func saveHealth(

@@ -117,7 +117,7 @@ struct HelpView: View {
                     )
                     HelpPermissionRow(
                         title: "语音识别",
-                        subtitle: "Apple Speech 模型需要",
+                        subtitle: "系统自带模型需要",
                         systemImage: "waveform",
                         status: speechPermissionTitle,
                         satisfied: speechPermissionSatisfied

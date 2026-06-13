@@ -1,11 +1,14 @@
+import AppKit
 import SwiftUI
 
 struct SettingsRootView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @ObservedObject var llmProviderViewModel: LLMProviderViewModel
     @ObservedObject var asrProviderViewModel: ASRProviderViewModel
-    @State private var shortcutKeyCodeText = ""
+    @State private var isRecordingShortcut = false
+    @State private var shortcutMonitor: Any?
     @State private var importedJSON = ""
+    @AppStorage(RepositoryBackedLLMRefiner.enabledDefaultsKey) private var llmCorrectionEnabled = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -17,7 +20,8 @@ struct SettingsRootView: View {
                         .font(.system(size: 30, weight: .bold))
                     ActionFeedbackView(
                         message: viewModel.lastActionMessage,
-                        error: viewModel.lastError
+                        error: viewModel.lastError,
+                        onDismiss: viewModel.clearFeedback
                     )
                     sectionContent
                 }
@@ -28,8 +32,10 @@ struct SettingsRootView: View {
         }
         .background(AppTheme.ColorToken.pageBackground)
         .onAppear {
-            shortcutKeyCodeText = "\(viewModel.shortcutKeyCode)"
             viewModel.load()
+        }
+        .onDisappear {
+            stopShortcutRecording()
         }
     }
 
@@ -86,6 +92,13 @@ struct SettingsRootView: View {
                 systemImage: "network",
                 tint: .blue
             ) {
+                SettingsToggleRow(
+                    title: "启用 LLM 纠错",
+                    subtitle: "听写完成后使用默认 OpenAI 兼容模型润色文本",
+                    systemImage: "sparkles",
+                    tint: .blue,
+                    isOn: $llmCorrectionEnabled
+                )
                 LLMProviderView(viewModel: llmProviderViewModel, embedded: true)
             }
             SettingsGroupCard(
@@ -126,6 +139,9 @@ struct SettingsRootView: View {
                             Text(selectedInputDeviceName)
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(AppTheme.ColorToken.primaryText)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .help(selectedInputDeviceName)
                             Text("点击更换输入设备")
                                 .font(.system(size: 12))
                                 .foregroundStyle(AppTheme.ColorToken.secondaryText)
@@ -150,19 +166,15 @@ struct SettingsRootView: View {
                     HStack(spacing: 14) {
                         SettingsRowIcon(systemImage: "command", tint: .purple)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("快捷键 KeyCode")
+                            Text("录制快捷键")
                                 .font(.system(size: 15, weight: .semibold))
-                            Text("默认 54，对应右 Command")
+                            Text(isRecordingShortcut ? "按下想用于听写的按键" : "当前：\(shortcutDisplayName)")
                                 .font(.system(size: 12))
-                                .foregroundStyle(AppTheme.ColorToken.secondaryText)
+                                .foregroundStyle(isRecordingShortcut ? Color.purple : AppTheme.ColorToken.secondaryText)
                         }
                         Spacer()
-                        TextField("KeyCode", text: $shortcutKeyCodeText)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 110)
-                            .onSubmit { viewModel.applyShortcutKeyCode(shortcutKeyCodeText) }
-                        Button("应用") {
-                            viewModel.applyShortcutKeyCode(shortcutKeyCodeText)
+                        Button(isRecordingShortcut ? "正在录制..." : "录制") {
+                            toggleShortcutRecording()
                         }
                         .buttonStyle(.bordered)
                     }
@@ -173,29 +185,14 @@ struct SettingsRootView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("短按行为")
                                 .font(.system(size: 15, weight: .semibold))
-                            Text("按一次开始，再按一次停止")
+                            Text(shortPressBehaviorDescription)
                                 .font(.system(size: 12))
                                 .foregroundStyle(AppTheme.ColorToken.secondaryText)
                         }
                         Spacer()
-                        Picker("", selection: shortPressBinding) {
-                            Text("切换听写").tag(ShortPressBehavior.toggleListening)
-                            Text("无操作").tag(ShortPressBehavior.none)
-                        }
-                        .labelsHidden()
-                        .frame(width: 160)
-                    }
-                    .settingsRow()
-
-                    VStack(alignment: .leading, spacing: 9) {
-                        HStack {
-                            Text("长按阈值")
-                                .font(.system(size: 14, weight: .semibold))
-                            Spacer()
-                            Text("\(viewModel.longPressThreshold, specifier: "%.2f") 秒")
-                                .foregroundStyle(AppTheme.ColorToken.secondaryText)
-                        }
-                        Slider(value: thresholdBinding, in: 0.2...1.5)
+                        Toggle("", isOn: shortPressToggleBinding)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
                     }
                     .settingsRow()
                 }
@@ -303,7 +300,7 @@ struct SettingsRootView: View {
                 )
                 permissionRow(
                     title: "语音识别",
-                    subtitle: "Apple Speech 模型需要此权限",
+                    subtitle: "系统自带模型需要此权限",
                     systemImage: "waveform",
                     status: speechPermissionTitle,
                     granted: speechPermissionSatisfied,
@@ -352,7 +349,6 @@ struct SettingsRootView: View {
                     Button("重置设置", role: .destructive) {
                         perform {
                             try viewModel.resetSettings()
-                            shortcutKeyCodeText = "\(viewModel.shortcutKeyCode)"
                         }
                     }
                 }
@@ -447,6 +443,19 @@ struct SettingsRootView: View {
             ?? "系统默认麦克风"
     }
 
+    private var shortcutDisplayName: String {
+        keyDisplayName(for: viewModel.shortcutKeyCode)
+    }
+
+    private var shortPressBehaviorDescription: String {
+        switch viewModel.shortPressBehavior {
+        case .toggleListening:
+            return "短按切换听写：按一次开始，再按一次停止"
+        case .none:
+            return "短按不触发：仅长按录音，松开完成"
+        }
+    }
+
     private var isLocalASRDefault: Bool {
         asrProviderViewModel.providers.contains {
             $0.id == ASRProviderID.qwen3 && $0.isDefault
@@ -531,30 +540,15 @@ struct SettingsRootView: View {
         )
     }
 
-    private var thresholdBinding: Binding<Double> {
+    private var shortPressToggleBinding: Binding<Bool> {
         Binding(
-            get: { viewModel.longPressThreshold },
-            set: { value in
+            get: { viewModel.shortPressBehavior == .toggleListening },
+            set: { isEnabled in
                 perform {
                     try viewModel.updateShortcut(
-                        keyCode: Int64(shortcutKeyCodeText) ?? viewModel.shortcutKeyCode,
-                        longPressThreshold: value,
-                        shortPressBehavior: viewModel.shortPressBehavior
-                    )
-                }
-            }
-        )
-    }
-
-    private var shortPressBinding: Binding<ShortPressBehavior> {
-        Binding(
-            get: { viewModel.shortPressBehavior },
-            set: { value in
-                perform {
-                    try viewModel.updateShortcut(
-                        keyCode: Int64(shortcutKeyCodeText) ?? viewModel.shortcutKeyCode,
+                        keyCode: viewModel.shortcutKeyCode,
                         longPressThreshold: viewModel.longPressThreshold,
-                        shortPressBehavior: value
+                        shortPressBehavior: isEnabled ? .toggleListening : .none
                     )
                 }
             }
@@ -615,6 +609,72 @@ struct SettingsRootView: View {
             try action()
         } catch {
             viewModel.report(error: error)
+        }
+    }
+
+    private func toggleShortcutRecording() {
+        if isRecordingShortcut {
+            stopShortcutRecording()
+            return
+        }
+        isRecordingShortcut = true
+        shortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
+            recordShortcut(from: event)
+            return nil
+        }
+    }
+
+    private func stopShortcutRecording() {
+        if let shortcutMonitor {
+            NSEvent.removeMonitor(shortcutMonitor)
+            self.shortcutMonitor = nil
+        }
+        isRecordingShortcut = false
+    }
+
+    private func recordShortcut(from event: NSEvent) {
+        let keyCode = Int64(event.keyCode)
+        guard keyCode > 0 else {
+            viewModel.report(error: SettingsViewModelError.invalidShortcutKeyCode)
+            stopShortcutRecording()
+            return
+        }
+        perform {
+            try viewModel.updateShortcut(
+                keyCode: keyCode,
+                longPressThreshold: viewModel.longPressThreshold,
+                shortPressBehavior: viewModel.shortPressBehavior
+            )
+        }
+        stopShortcutRecording()
+    }
+
+    private func keyDisplayName(for keyCode: Int64) -> String {
+        switch keyCode {
+        case 54:
+            return "右 Command"
+        case 55:
+            return "左 Command"
+        case 56:
+            return "左 Shift"
+        case 60:
+            return "右 Shift"
+        case 58:
+            return "左 Option"
+        case 61:
+            return "右 Option"
+        case 59:
+            return "左 Control"
+        case 62:
+            return "右 Control"
+        case 36:
+            return "Return"
+        case 49:
+            return "Space"
+        case 53:
+            return "Escape"
+        default:
+            return "按键 \(keyCode)"
         }
     }
 }

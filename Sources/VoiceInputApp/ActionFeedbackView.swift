@@ -10,15 +10,38 @@ struct ActionFeedbackView: View {
     let message: String?
     let error: String?
     var tone: ActionFeedbackTone = .success
+    var autoDismissAfter: TimeInterval? = 2.6
+    var onDismiss: (() -> Void)?
+
+    @State private var isVisible = false
 
     var body: some View {
-        if let error {
-            Label(error, systemImage: "exclamationmark.triangle.fill")
-                .feedbackStyle(color: .red)
-        } else if let message {
-            Label(message, systemImage: iconName)
-                .feedbackStyle(color: color)
+        Group {
+            if isVisible, let error {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .feedbackStyle(color: .red)
+            } else if isVisible, let message {
+                Label(message, systemImage: iconName)
+                    .feedbackStyle(color: color)
+            }
         }
+        .task(id: feedbackKey) {
+            guard let activeKey = feedbackKey else {
+                isVisible = false
+                return
+            }
+            isVisible = true
+            guard let autoDismissAfter else { return }
+            try? await Task.sleep(nanoseconds: UInt64(autoDismissAfter * 1_000_000_000))
+            if feedbackKey == activeKey {
+                isVisible = false
+                onDismiss?()
+            }
+        }
+    }
+
+    private var feedbackKey: String? {
+        error ?? message
     }
 
     private var iconName: String {
@@ -49,9 +72,12 @@ private extension View {
         self
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(color)
+            .lineLimit(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 360, maxHeight: 96, alignment: .leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(color.opacity(0.12))
+            .background(AppTheme.ColorToken.panelBackground)
             .overlay(
                 RoundedRectangle(cornerRadius: AppTheme.Radius.control, style: .continuous)
                     .stroke(color.opacity(0.28))

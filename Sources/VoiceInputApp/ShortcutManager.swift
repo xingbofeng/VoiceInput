@@ -8,6 +8,8 @@ enum ShortPressBehavior: String, CaseIterable, Codable, Equatable {
 /// Manages keyboard shortcut preferences stored in UserDefaults.
 final class ShortcutManager: @unchecked Sendable {
     static let shared = ShortcutManager()
+    static let defaultShortcutKeyCode: Int64 = 54
+    static let defaultLongPressThreshold: TimeInterval = 0.5
 
     private let defaults: UserDefaults
 
@@ -29,7 +31,7 @@ final class ShortcutManager: @unchecked Sendable {
     var shortcutKeyCode: Int64 {
         get {
             guard defaults.object(forKey: Keys.shortcutKeyCode) != nil else {
-                return 54
+                return Self.defaultShortcutKeyCode
             }
             return Int64(defaults.integer(forKey: Keys.shortcutKeyCode))
         }
@@ -44,7 +46,7 @@ final class ShortcutManager: @unchecked Sendable {
     var longPressThreshold: TimeInterval {
         get {
             guard defaults.object(forKey: Keys.longPressThreshold) != nil else {
-                return 0.5
+                return Self.defaultLongPressThreshold
             }
             return defaults.double(forKey: Keys.longPressThreshold)
         }

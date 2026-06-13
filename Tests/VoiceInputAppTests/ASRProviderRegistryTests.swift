@@ -23,16 +23,17 @@ final class ASRProviderRegistryTests: XCTestCase {
         let apple = try XCTUnwrap(registry.descriptor(id: ASRProviderID.appleSpeech))
         let qwen = try XCTUnwrap(registry.descriptor(id: ASRProviderID.qwen3))
 
+        XCTAssertEqual(apple.displayName, "系统自带")
         XCTAssertTrue(apple.capabilities.contains(.streaming))
         XCTAssertTrue(apple.capabilities.contains(.punctuation))
         XCTAssertTrue(qwen.capabilities.contains(.local))
         XCTAssertTrue(qwen.capabilities.contains(.multilingual))
-        XCTAssertTrue(qwen.tags.contains("local"))
+        XCTAssertTrue(qwen.tags.contains("本地"))
     }
 
     func testFilteringByCapabilityAndTag() {
         let localProviders = registry.descriptors(
-            matching: ASRProviderFilter(requiredCapabilities: [.local], tags: ["local"])
+            matching: ASRProviderFilter(requiredCapabilities: [.local], tags: ["本地"])
         )
 
         XCTAssertEqual(localProviders.map(\.id), [ASRProviderID.qwen3])
@@ -42,8 +43,10 @@ final class ASRProviderRegistryTests: XCTestCase {
         manager.selectedEngineType = .qwen3
 
         let defaultProvider = try registry.defaultProvider()
+        let qwenDescriptor = try XCTUnwrap(registry.descriptor(id: ASRProviderID.qwen3))
         let fallbackChain = registry.fallbackChain(startingAt: ASRProviderID.qwen3)
 
+        XCTAssertTrue(qwenDescriptor.isDefault)
         XCTAssertEqual(defaultProvider.id, ASRProviderID.appleSpeech)
         XCTAssertEqual(fallbackChain.map(\.id), [ASRProviderID.appleSpeech])
     }

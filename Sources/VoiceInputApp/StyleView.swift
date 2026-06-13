@@ -98,7 +98,8 @@ struct StyleView: View {
 
             ActionFeedbackView(
                 message: viewModel.lastActionMessage,
-                error: viewModel.lastError
+                error: viewModel.lastError,
+                onDismiss: viewModel.clearFeedback
             )
 
             HSplitView {

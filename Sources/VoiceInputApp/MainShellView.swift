@@ -26,18 +26,21 @@ struct MainShellView: View {
                 Divider()
                 detailView
             } else {
-                VStack(spacing: 0) {
-                    HStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
+                    VStack(spacing: 0) {
                         sidebarToggle(alignment: .leading)
-                            .frame(width: 56)
-                        Divider()
-                        detailView
+                        Spacer(minLength: 0)
                     }
+                    .frame(width: 56)
+                    .frame(maxHeight: .infinity)
+                    .background(AppTheme.ColorToken.sidebarBackground)
+                    Divider()
+                    detailView
                 }
             }
         }
         .frame(minWidth: 1_100, minHeight: 720)
-        .preferredColorScheme(settingsViewModel.systemOption(.darkMode) ? .dark : nil)
+        .preferredColorScheme(settingsViewModel.systemOption(.darkMode) ? .dark : .light)
         .onAppear {
             viewModel.load()
         }
@@ -69,9 +72,9 @@ struct MainShellView: View {
             } label: {
                 Image(systemName: "sidebar.leading")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(AppTheme.ColorToken.primaryText)
+                    .foregroundStyle(.white)
                     .frame(width: 34, height: 34)
-                    .background(AppTheme.ColorToken.panelBackground.opacity(0.6))
+                    .background(AppTheme.ColorToken.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .contentShape(Rectangle())
             }

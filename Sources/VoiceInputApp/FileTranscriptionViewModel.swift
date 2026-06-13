@@ -359,6 +359,11 @@ final class FileTranscriptionViewModel: ObservableObject {
         lastActionMessage = nil
     }
 
+    func clearFeedback() {
+        lastError = nil
+        lastActionMessage = nil
+    }
+
     func statusTitle(for job: TranscriptionJobRecord) -> String {
         switch TranscriptionJobStatus(rawValue: job.status) {
         case .queued:

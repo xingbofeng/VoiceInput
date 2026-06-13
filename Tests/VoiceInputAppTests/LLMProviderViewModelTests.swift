@@ -62,6 +62,62 @@ final class LLMProviderViewModelTests: XCTestCase {
         XCTAssertEqual(store.value(for: "llm-provider-provider"), "secret")
     }
 
+    func testAPIKeyForEditingUsesUniformMaskAndCanRevealStoredKey() throws {
+        let store = InMemoryProviderCredentialStore()
+        let environment = AppEnvironment(
+            container: try DependencyContainer.inMemory(credentialStore: store)
+        )
+        let viewModel = LLMProviderViewModel(environment: environment, client: StubProviderClient())
+        try viewModel.saveProvider(
+            id: "provider",
+            displayName: "Provider",
+            baseURL: "https://api.example.com",
+            model: "model-a",
+            apiKey: "sk-real-secret-value",
+            temperature: 0.2,
+            timeoutSeconds: 8,
+            enabled: true,
+            isDefault: true
+        )
+
+        XCTAssertEqual(viewModel.APIKeyForEditing(providerID: "provider"), "••••••••••••")
+        XCTAssertEqual(viewModel.storedAPIKeyForEditing(providerID: "provider"), "sk-real-secret-value")
+        XCTAssertTrue(
+            viewModel.isMaskedAPIKey(providerID: "provider", text: "••••••••••••")
+        )
+    }
+
+    func testDraftConnectionUsesStoredKeyWhenDraftStillContainsMask() async throws {
+        let store = InMemoryProviderCredentialStore()
+        let environment = AppEnvironment(
+            container: try DependencyContainer.inMemory(credentialStore: store)
+        )
+        let client = CapturingProviderClient()
+        let viewModel = LLMProviderViewModel(environment: environment, client: client)
+        try viewModel.saveProvider(
+            id: "provider",
+            displayName: "Provider",
+            baseURL: "https://api.example.com",
+            model: "model-a",
+            apiKey: "stored-secret",
+            temperature: 0.2,
+            timeoutSeconds: 8,
+            enabled: true,
+            isDefault: true
+        )
+
+        await viewModel.testDraftConnection(
+            providerID: "provider",
+            displayName: "Provider",
+            baseURL: "https://draft.example.com/v1/",
+            model: "draft-model",
+            apiKey: viewModel.APIKeyForEditing(providerID: "provider")
+        )
+
+        XCTAssertEqual(client.lastAPIKey, "stored-secret")
+        XCTAssertEqual(viewModel.lastActionMessage, "连接测试成功")
+    }
+
     func testDraftConnectionUsesUnsavedFields() async throws {
         let store = InMemoryProviderCredentialStore()
         let environment = AppEnvironment(

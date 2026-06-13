@@ -28,7 +28,8 @@ struct FileTranscriptionView: View {
             ActionFeedbackView(
                 message: viewModel.lastActionMessage,
                 error: viewModel.lastError,
-                tone: viewModel.lastActionTone
+                tone: viewModel.lastActionTone,
+                onDismiss: viewModel.clearFeedback
             )
             .padding(AppTheme.Spacing.page)
         }

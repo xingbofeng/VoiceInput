@@ -7,6 +7,60 @@ private final class ManagerBox: @unchecked Sendable {
     init(_ value: Any) { self.value = value }
 }
 
+struct Qwen3StreamingUpdate: Sendable, Equatable {
+    let transcript: String
+    let isFinal: Bool
+}
+
+protocol Qwen3StreamingSession: Sendable {
+    func addAudio(_ samples: [Float]) async throws -> Qwen3StreamingUpdate?
+    func finish() async throws -> Qwen3StreamingUpdate
+    func cancel() async
+}
+
+protocol Qwen3StreamingSessionMaking: Sendable {
+    func makeSession(modelURL: URL, languageHint: String?) async throws -> any Qwen3StreamingSession
+}
+
+struct FluidAudioQwen3StreamingSessionFactory: Qwen3StreamingSessionMaking {
+    func makeSession(modelURL: URL, languageHint: String?) async throws -> any Qwen3StreamingSession {
+        guard #available(macOS 15, *) else {
+            throw Qwen3ASREngineError.unsupportedOS
+        }
+        let manager = Qwen3AsrManager()
+        try await manager.loadModels(from: modelURL)
+        let language = languageHint.flatMap(Qwen3AsrConfig.Language.init(rawValue:))
+        let config = Qwen3StreamingConfig(
+            minAudioSeconds: 1.0,
+            chunkSeconds: 1.0,
+            maxAudioSeconds: 30.0,
+            language: language
+        )
+        return FluidAudioQwen3StreamingSession(
+            manager: Qwen3StreamingManager(asrManager: manager, config: config)
+        )
+    }
+}
+
+@available(macOS 15, *)
+private struct FluidAudioQwen3StreamingSession: Qwen3StreamingSession {
+    let manager: Qwen3StreamingManager
+
+    func addAudio(_ samples: [Float]) async throws -> Qwen3StreamingUpdate? {
+        guard let result = try await manager.addAudio(samples) else { return nil }
+        return Qwen3StreamingUpdate(transcript: result.transcript, isFinal: result.isFinal)
+    }
+
+    func finish() async throws -> Qwen3StreamingUpdate {
+        let result = try await manager.finish()
+        return Qwen3StreamingUpdate(transcript: result.transcript, isFinal: result.isFinal)
+    }
+
+    func cancel() async {
+        await manager.reset()
+    }
+}
+
 /// Qwen3-ASR CoreML-based speech recognition engine.
 final class Qwen3ASREngine: NSObject, @unchecked Sendable, ASREngine {
     // MARK: - ASREngine
@@ -19,23 +73,29 @@ final class Qwen3ASREngine: NSObject, @unchecked Sendable, ASREngine {
 
     /// Path to the FluidAudio-compatible Qwen3-ASR model directory.
     private let modelPath: String?
+    private let sessionFactory: any Qwen3StreamingSessionMaking
     private var languageHint: String?
 
     /// Accumulated 16kHz mono audio samples during recording.
     private var audioBuffer: [Float] = []
 
-    /// Pre-loaded Qwen3AsrManager task — created in `start()` so model loading
+    /// Pre-loaded Qwen3 streaming session task — created in `start()` so model loading
     /// happens during recording, not during `endAudio()`.
     /// Stored as `Any` to avoid `@available(macOS 15, *)` on the stored property.
-    private var managerTask: Task<ManagerBox, Error>?
+    private var sessionTask: Task<ManagerBox, Error>?
+    private var streamingTasks: [Task<Void, Never>] = []
 
     // MARK: - Initialization
 
     /// Creates a Qwen3-ASR engine.
     /// - Parameter modelPath: Path to the compiled .mlmodelc directory,
     ///   or nil if no model is available.
-    init(modelPath: String?) {
+    init(
+        modelPath: String?,
+        sessionFactory: any Qwen3StreamingSessionMaking = FluidAudioQwen3StreamingSessionFactory()
+    ) {
         self.modelPath = modelPath
+        self.sessionFactory = sessionFactory
         if let modelPath {
             self.isAvailable = Qwen3ModelManifest.supportedModelExists(
                 at: URL(fileURLWithPath: modelPath, isDirectory: true)
@@ -49,11 +109,18 @@ final class Qwen3ASREngine: NSObject, @unchecked Sendable, ASREngine {
     // MARK: - ASREngine Methods
 
     func configure(locale: Locale) {
-        languageHint = Self.qwen3LanguageHint(for: locale)
+        let nextLanguageHint = Self.qwen3LanguageHint(for: locale)
+        if nextLanguageHint != languageHint {
+            sessionTask?.cancel()
+            sessionTask = nil
+        }
+        languageHint = nextLanguageHint
     }
 
     func start() throws {
         audioBuffer = []
+        streamingTasks.forEach { $0.cancel() }
+        streamingTasks = []
 
         guard isAvailable else {
             throw Qwen3ASREngineError.modelNotAvailable
@@ -62,14 +129,18 @@ final class Qwen3ASREngine: NSObject, @unchecked Sendable, ASREngine {
             throw Qwen3ASREngineError.unsupportedOS
         }
 
-        // Pre-load CoreML models in background during recording.
+        // Pre-load CoreML models and streaming session in background during recording.
         // This avoids the 2-5s model-load penalty in endAudio().
-        if managerTask == nil, let path = modelPath {
+        if sessionTask == nil, let path = modelPath {
             let url = URL(fileURLWithPath: path, isDirectory: true)
-            managerTask = Task<ManagerBox, Error> {
-                let manager = Qwen3AsrManager()
-                try await manager.loadModels(from: url)
-                return ManagerBox(manager)
+            let languageHint = languageHint
+            let sessionFactory = sessionFactory
+            sessionTask = Task<ManagerBox, Error> {
+                let session = try await sessionFactory.makeSession(
+                    modelURL: url,
+                    languageHint: languageHint
+                )
+                return ManagerBox(session)
             }
         }
     }
@@ -79,6 +150,25 @@ final class Qwen3ASREngine: NSObject, @unchecked Sendable, ASREngine {
 
         if let resampled = AudioPreprocessor.resampleTo16kHz(buffer) {
             audioBuffer.append(contentsOf: resampled)
+            let sessionTask = sessionTask
+            let task = Task { [weak self, resampled] in
+                do {
+                    guard let sessionTask else { return }
+                    let session = try await sessionTask.value.value as! any Qwen3StreamingSession
+                    if let update = try await session.addAudio(resampled),
+                       !update.transcript.isEmpty {
+                        await MainActor.run {
+                            self?.onTranscription?(update.transcript, update.isFinal)
+                        }
+                    }
+                } catch is CancellationError {
+                } catch {
+                    await MainActor.run {
+                        self?.onError?(error)
+                    }
+                }
+            }
+            streamingTasks.append(task)
         }
     }
 
@@ -97,7 +187,8 @@ final class Qwen3ASREngine: NSObject, @unchecked Sendable, ASREngine {
         }
 
         // Capture the pre-load task (start() already kicked it off).
-        let task = managerTask
+        let task = sessionTask
+        let pendingStreamingTasks = streamingTasks
 
         Task {
             do {
@@ -105,24 +196,27 @@ final class Qwen3ASREngine: NSObject, @unchecked Sendable, ASREngine {
                     throw Qwen3ASREngineError.unsupportedOS
                 }
 
-                let manager: Qwen3AsrManager
-                if let task {
-                    // Reuse pre-loaded model — no disk I/O here.
-                    manager = try await task.value.value as! Qwen3AsrManager
-                } else {
-                    // Fallback: load now (shouldn't normally happen).
-                    manager = Qwen3AsrManager()
-                    let url = URL(fileURLWithPath: modelPath, isDirectory: true)
-                    try await manager.loadModels(from: url)
+                for task in pendingStreamingTasks {
+                    await task.value
                 }
 
-                let text = try await manager.transcribe(
-                    audioSamples: samples,
-                    language: languageHint
-                )
+                let session: any Qwen3StreamingSession
+                if let task {
+                    session = try await task.value.value as! any Qwen3StreamingSession
+                } else {
+                    // Fallback: load now (shouldn't normally happen).
+                    let url = URL(fileURLWithPath: modelPath, isDirectory: true)
+                    session = try await self.sessionFactory.makeSession(
+                        modelURL: url,
+                        languageHint: languageHint
+                    )
+                    _ = try await session.addAudio(samples)
+                }
+
+                let update = try await session.finish()
                 let capturedOnTranscription = onTranscription
                 await MainActor.run {
-                    capturedOnTranscription?(text, true)
+                    capturedOnTranscription?(update.transcript, true)
                 }
             } catch {
                 let capturedOnError = onError
@@ -135,13 +229,17 @@ final class Qwen3ASREngine: NSObject, @unchecked Sendable, ASREngine {
 
     func stop() {
         audioBuffer = []
-        // Keep managerTask alive — model stays loaded for next recording.
+        streamingTasks.forEach { $0.cancel() }
+        streamingTasks = []
+        // Keep sessionTask alive — model stays loaded for next recording.
     }
 
     func cancel() {
         audioBuffer = []
-        managerTask?.cancel()
-        managerTask = nil
+        streamingTasks.forEach { $0.cancel() }
+        streamingTasks = []
+        sessionTask?.cancel()
+        sessionTask = nil
     }
 
     private static func qwen3LanguageHint(for locale: Locale) -> String? {

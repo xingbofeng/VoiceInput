@@ -123,7 +123,7 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.lastActionMessage, "已应用快捷键")
 
         viewModel.applyShortcutKeyCode("invalid")
-        XCTAssertEqual(viewModel.lastError, "快捷键 KeyCode 必须是整数。")
+        XCTAssertEqual(viewModel.lastError, "快捷键录制失败，请按下一个有效按键。")
     }
 
     func testExtendedSystemAndPrivacyOptionsPersist() throws {

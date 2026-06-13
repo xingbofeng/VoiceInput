@@ -5,6 +5,10 @@ struct AppVersionInfo: Equatable {
     let build: String
 
     var displayText: String {
+        version
+    }
+
+    var detailedDisplayText: String {
         "\(version) (\(build))"
     }
 

@@ -27,12 +27,12 @@ final class ASRProviderViewModelTests: XCTestCase {
             registry: ASRProviderRegistry(asrManager: manager)
         )
 
-        viewModel.toggleTag("local")
+        viewModel.toggleTag("本地")
 
         XCTAssertEqual(viewModel.visibleProviders.map(\.id), [ASRProviderID.qwen3])
     }
 
-    func testSelectingUnavailableQwenKeepsAppleAsDefault() throws {
+    func testSelectingUnavailableQwenDoesNotForceAppleFallback() throws {
         let manager = makeManager()
         let environment = AppEnvironment(container: try DependencyContainer.inMemory())
         let viewModel = ASRProviderViewModel(
@@ -46,6 +46,23 @@ final class ASRProviderViewModelTests: XCTestCase {
         XCTAssertEqual(manager.selectedEngineType, .apple)
         XCTAssertEqual(viewModel.providers.first?.id, ASRProviderID.appleSpeech)
         XCTAssertNotNil(viewModel.lastError)
+    }
+
+    func testSelectingUnavailableQwenSizeKeepsQwenHighlighted() throws {
+        let manager = makeManager()
+        manager.selectedEngineType = .qwen3
+        let environment = AppEnvironment(container: try DependencyContainer.inMemory())
+        let viewModel = ASRProviderViewModel(
+            environment: environment,
+            asrManager: manager,
+            registry: ASRProviderRegistry(asrManager: manager)
+        )
+
+        viewModel.selectQwenModelSize(.size1_7B)
+
+        XCTAssertEqual(manager.selectedEngineType, .qwen3)
+        XCTAssertEqual(viewModel.providers.first(where: \.isDefault)?.id, ASRProviderID.qwen3)
+        XCTAssertFalse(viewModel.providers.first(where: { $0.id == ASRProviderID.qwen3 })?.isAvailable ?? true)
     }
 
     func testSelectingAvailableProviderMovesDefaultWithoutPersistentSuccessBanner() throws {

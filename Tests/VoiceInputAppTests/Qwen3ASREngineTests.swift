@@ -94,6 +94,49 @@ final class Qwen3ASREngineTests: XCTestCase {
         XCTAssertTrue(receivedIsFinal)
     }
 
+    func testAppendAudioEmitsStreamingPartial() async throws {
+        let session = FakeQwen3StreamingSession(
+            partial: Qwen3StreamingUpdate(transcript: "实时片段", isFinal: false),
+            final: Qwen3StreamingUpdate(transcript: "最终文本", isFinal: true)
+        )
+        let engine = makeEngineWithExistingModelPath(
+            sessionFactory: FakeQwen3StreamingSessionFactory(session: session)
+        )
+        let partial = expectation(description: "Qwen3 emits a streaming partial")
+        engine.onTranscription = { text, isFinal in
+            if text == "实时片段" && !isFinal {
+                partial.fulfill()
+            }
+        }
+
+        try engine.start()
+        engine.appendAudioBuffer(makeAudioBuffer(sampleCount: 16_000))
+
+        await fulfillment(of: [partial], timeout: 1.0)
+    }
+
+    func testEndAudioEmitsStreamingFinal() async throws {
+        let session = FakeQwen3StreamingSession(
+            partial: Qwen3StreamingUpdate(transcript: "实时片段", isFinal: false),
+            final: Qwen3StreamingUpdate(transcript: "最终文本", isFinal: true)
+        )
+        let engine = makeEngineWithExistingModelPath(
+            sessionFactory: FakeQwen3StreamingSessionFactory(session: session)
+        )
+        let final = expectation(description: "Qwen3 emits a final streaming result")
+        engine.onTranscription = { text, isFinal in
+            if text == "最终文本" && isFinal {
+                final.fulfill()
+            }
+        }
+
+        try engine.start()
+        engine.appendAudioBuffer(makeAudioBuffer(sampleCount: 16_000))
+        engine.endAudio()
+
+        await fulfillment(of: [final], timeout: 1.0)
+    }
+
     func testOnErrorCallbackIsSet() {
         // onError is nil by default on a new engine
         let engine = makeEngineWithExistingModelPath()
@@ -118,14 +161,30 @@ final class Qwen3ASREngineTests: XCTestCase {
         XCTAssertTrue(engine.isAvailable)
     }
 
-    private func makeEngineWithExistingModelPath() -> Qwen3ASREngine {
+    private func makeEngineWithExistingModelPath(
+        sessionFactory: any Qwen3StreamingSessionMaking = FluidAudioQwen3StreamingSessionFactory()
+    ) -> Qwen3ASREngine {
         let modelURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("VoiceInputTests-\(UUID().uuidString)")
         try! createLoadableQwen3ModelDirectory(at: modelURL)
         addTeardownBlock {
             try? FileManager.default.removeItem(at: modelURL)
         }
-        return Qwen3ASREngine(modelPath: modelURL.path)
+        return Qwen3ASREngine(modelPath: modelURL.path, sessionFactory: sessionFactory)
+    }
+
+    private func makeAudioBuffer(sampleCount: Int) -> AVAudioPCMBuffer {
+        let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)!
+        let buffer = AVAudioPCMBuffer(
+            pcmFormat: format,
+            frameCapacity: AVAudioFrameCount(sampleCount)
+        )!
+        buffer.frameLength = AVAudioFrameCount(sampleCount)
+        let channel = buffer.floatChannelData![0]
+        for index in 0..<sampleCount {
+            channel[index] = sin(Float(index) / 40.0) * 0.1
+        }
+        return buffer
     }
 
     private func createLoadableQwen3ModelDirectory(at modelURL: URL) throws {
@@ -138,4 +197,38 @@ final class Qwen3ASREngineTests: XCTestCase {
             XCTAssertTrue(FileManager.default.createFile(atPath: fileURL.path, contents: Data()))
         }
     }
+}
+
+private final class FakeQwen3StreamingSessionFactory: Qwen3StreamingSessionMaking, @unchecked Sendable {
+    let session: FakeQwen3StreamingSession
+
+    init(session: FakeQwen3StreamingSession) {
+        self.session = session
+    }
+
+    func makeSession(modelURL: URL, languageHint: String?) async throws -> any Qwen3StreamingSession {
+        session
+    }
+}
+
+private actor FakeQwen3StreamingSession: Qwen3StreamingSession {
+    let partial: Qwen3StreamingUpdate?
+    let final: Qwen3StreamingUpdate
+    private(set) var receivedChunkCount = 0
+
+    init(partial: Qwen3StreamingUpdate?, final: Qwen3StreamingUpdate) {
+        self.partial = partial
+        self.final = final
+    }
+
+    func addAudio(_ samples: [Float]) async throws -> Qwen3StreamingUpdate? {
+        receivedChunkCount += 1
+        return partial
+    }
+
+    func finish() async throws -> Qwen3StreamingUpdate {
+        final
+    }
+
+    func cancel() async {}
 }

@@ -145,7 +145,7 @@ final class ASRProviderRegistry {
     }
 
     private func builtInDescriptors() -> [String: ASRProviderDescriptor] {
-        let selectedID = asrManager.effectiveSelectedEngineType.providerID
+        let selectedID = asrManager.selectedEngineType.providerID
         let qwenAvailable = asrManager.isQwen3ModelAvailable
         let qwenMessage = qwenAvailable
             ? "本地模型已就绪"
@@ -153,10 +153,10 @@ final class ASRProviderRegistry {
 
         let apple = ASRProviderDescriptor(
             id: ASRProviderID.appleSpeech,
-            displayName: "Apple Speech",
+            displayName: "系统自带",
             providerType: "appleSpeech",
             capabilities: [.streaming, .cloud, .fast, .multilingual, .punctuation],
-            tags: ["system", "streaming", "multilingual"],
+            tags: ["系统", "流式", "多语言"],
             isAvailable: true,
             isDefault: selectedID == ASRProviderID.appleSpeech,
             statusMessage: "系统语音识别可用",
@@ -169,9 +169,9 @@ final class ASRProviderRegistry {
             displayName: "Qwen3-ASR",
             providerType: "qwen3",
             capabilities: [.streaming, .local, .accurate, .multilingual, .punctuation],
-            tags: ["local", "offline", "multilingual", asrManager.qwen3ModelSize.rawValue],
+            tags: ["本地", "离线", "多语言", asrManager.qwen3ModelSize.rawValue],
             isAvailable: qwenAvailable,
-            isDefault: selectedID == ASRProviderID.qwen3 && qwenAvailable,
+            isDefault: selectedID == ASRProviderID.qwen3,
             statusMessage: qwenMessage,
             privacySummary: "本地 CoreML 模型转写，音频不因该 Provider 上传。",
             modelSize: asrManager.qwen3ModelSize,

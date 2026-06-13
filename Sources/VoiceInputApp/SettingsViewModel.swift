@@ -123,8 +123,8 @@ final class SettingsViewModel: ObservableObject {
     @Published var selectedSection: SettingsSection = .general
     @Published private(set) var inputDevices: [AudioInputDevice] = []
     @Published private(set) var selectedInputDeviceID = ""
-    @Published private(set) var shortcutKeyCode: Int64 = 54
-    @Published private(set) var longPressThreshold: TimeInterval = 0.5
+    @Published private(set) var shortcutKeyCode: Int64 = ShortcutManager.defaultShortcutKeyCode
+    @Published private(set) var longPressThreshold: TimeInterval = ShortcutManager.defaultLongPressThreshold
     @Published private(set) var shortPressBehavior: ShortPressBehavior = .toggleListening
     @Published private(set) var soundFeedbackEnabled = true
     @Published private(set) var voiceEnhancementEnabled = true
@@ -362,8 +362,8 @@ final class SettingsViewModel: ObservableObject {
         for record in records {
             try environment.settingsRepository.deleteValue(forKey: record.key)
         }
-        shortcutManager.shortcutKeyCode = 54
-        shortcutManager.longPressThreshold = 0.5
+        shortcutManager.shortcutKeyCode = ShortcutManager.defaultShortcutKeyCode
+        shortcutManager.longPressThreshold = ShortcutManager.defaultLongPressThreshold
         shortcutManager.shortPressBehavior = .toggleListening
         exportedDataJSON = nil
         load()
@@ -373,6 +373,11 @@ final class SettingsViewModel: ObservableObject {
 
     func report(error: Error) {
         lastError = error.localizedDescription
+        lastActionMessage = nil
+    }
+
+    func clearFeedback() {
+        lastError = nil
         lastActionMessage = nil
     }
 
@@ -416,7 +421,7 @@ enum SettingsViewModelError: LocalizedError {
         case .invalidImport:
             return "导入数据格式不正确。"
         case .invalidShortcutKeyCode:
-            return "快捷键 KeyCode 必须是整数。"
+            return "快捷键录制失败，请按下一个有效按键。"
         }
     }
 }

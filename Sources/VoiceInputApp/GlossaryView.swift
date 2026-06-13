@@ -17,7 +17,8 @@ struct GlossaryView: View {
 
                 ActionFeedbackView(
                     message: viewModel.lastActionMessage,
-                    error: viewModel.lastError
+                    error: viewModel.lastError,
+                    onDismiss: viewModel.clearFeedback
                 )
 
                 switch selectedSection {

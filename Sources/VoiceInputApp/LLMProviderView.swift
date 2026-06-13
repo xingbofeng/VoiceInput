@@ -28,7 +28,8 @@ struct LLMProviderView: View {
 
             ActionFeedbackView(
                 message: viewModel.lastActionMessage,
-                error: viewModel.lastError
+                error: viewModel.lastError,
+                onDismiss: viewModel.clearFeedback
             )
 
             if viewModel.providers.isEmpty {
@@ -180,7 +181,15 @@ private struct LLMProviderEditorSheet: View {
                         }
                         .textFieldStyle(.roundedBorder)
                         Button {
-                            showAPIKey.toggle()
+                            if showAPIKey {
+                                apiKey = viewModel.APIKeyForEditing(providerID: provider?.id)
+                                showAPIKey = false
+                            } else {
+                                if viewModel.isMaskedAPIKey(providerID: provider?.id, text: apiKey) {
+                                    apiKey = viewModel.storedAPIKeyForEditing(providerID: provider?.id)
+                                }
+                                showAPIKey = true
+                            }
                         } label: {
                             Image(systemName: showAPIKey ? "eye.slash" : "eye")
                                 .frame(width: 32, height: 32)
@@ -200,7 +209,8 @@ private struct LLMProviderEditorSheet: View {
 
                 ActionFeedbackView(
                     message: viewModel.lastActionMessage,
-                    error: viewModel.lastError
+                    error: viewModel.lastError,
+                    onDismiss: viewModel.clearFeedback
                 )
 
                 Spacer()

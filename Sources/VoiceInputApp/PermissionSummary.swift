@@ -2,7 +2,7 @@ import Foundation
 
 enum PermissionSummary {
     static func statusText(_ granted: Bool) -> String {
-        granted ? "✅ 已授予" : "❌ 未授予"
+        granted ? "已授权" : "未授权"
     }
 
     static func speechRecognitionStatus(
@@ -23,7 +23,7 @@ enum PermissionSummary {
             return (
                 "需要录音与语音识别权限",
                 """
-                VoiceInput 需要麦克风和语音识别权限才能使用 Apple Speech。
+                VoiceInput 需要麦克风和语音识别权限才能使用系统自带模型。
 
                 请在 系统设置 → 隐私与安全性 中启用“麦克风”和“语音识别”权限。
                 """

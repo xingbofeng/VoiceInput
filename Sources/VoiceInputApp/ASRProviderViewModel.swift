@@ -82,7 +82,6 @@ final class ASRProviderViewModel: ObservableObject {
             lastActionMessage = nil
         } catch {
             let message = error.localizedDescription
-            asrManager.selectedEngineType = .apple
             load()
             lastError = message
         }
@@ -142,6 +141,11 @@ final class ASRProviderViewModel: ObservableObject {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    func clearFeedback() {
+        lastError = nil
+        lastActionMessage = nil
     }
 
     private func persistProviderRecords() throws {

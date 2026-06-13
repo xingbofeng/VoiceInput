@@ -30,15 +30,16 @@ struct NotesView: View {
                     TextEditor(text: $viewModel.draftBodyMarkdown)
                         .font(.system(size: 16))
                         .scrollContentBackground(.hidden)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                         .frame(minHeight: 128)
 
                     if viewModel.draftBodyMarkdown.isEmpty {
                         Text(recordingPlaceholder)
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(AppTheme.ColorToken.secondaryText.opacity(0.72))
-                            .padding(.top, 9)
-                            .padding(.leading, 9)
+                            .padding(.top, 16)
+                            .padding(.leading, 17)
                             .allowsHitTesting(false)
                     }
                 }
@@ -75,7 +76,8 @@ struct NotesView: View {
 
             ActionFeedbackView(
                 message: viewModel.lastActionMessage,
-                error: viewModel.lastError
+                error: viewModel.lastError,
+                onDismiss: viewModel.clearFeedback
             )
             .frame(maxWidth: 760)
         }

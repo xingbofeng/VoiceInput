@@ -1,6 +1,7 @@
 import AppKit
 import Speech
 import AVFoundation
+import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -10,7 +11,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let menu = NSMenu()
     private var languageMenuItems: [NSMenuItem] = []
     private var asrEngineMenuItems: [NSMenuItem] = []
-    private var llmToggleItem: NSMenuItem!
     private var refiningMenuItem: NSMenuItem!
     private var workbenchItem: NSMenuItem!
     private var settingsItem: NSMenuItem!
@@ -258,7 +258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // Workbench
         workbenchItem = NSMenuItem(
-            title: "打开工作台...",
+            title: "打开工作台",
             action: #selector(openWorkbench(_:)),
             keyEquivalent: ""
         )
@@ -267,27 +267,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // Settings
         settingsItem = NSMenuItem(
-            title: "设置...",
+            title: "设置",
             action: #selector(openSettings(_:)),
             keyEquivalent: ""
         )
         settingsItem.target = self
         menu.addItem(settingsItem)
 
-        menu.addItem(.separator())
-
-        llmToggleItem = NSMenuItem(
-            title: "LLM 纠错已关闭",
-            action: #selector(toggleLLM(_:)),
+        let githubItem = NSMenuItem(
+            title: "GitHub",
+            action: #selector(openGitHub(_:)),
             keyEquivalent: ""
         )
-        llmToggleItem.target = self
-        menu.addItem(llmToggleItem)
-        updateLLMToggleTitle()
+        githubItem.target = self
+        menu.addItem(githubItem)
+
+        menu.addItem(.separator())
 
         // Refining status (shown during active LLM refinement)
         refiningMenuItem = NSMenuItem(
-            title: "Refining...",
+            title: "正在 LLM 纠错",
             action: nil,
             keyEquivalent: ""
         )
@@ -298,7 +297,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // Quit
         let checkPermissionsItem = NSMenuItem(
-            title: "检查权限...",
+            title: "检查权限",
             action: #selector(checkPermissions(_:)),
             keyEquivalent: ""
         )
@@ -320,12 +319,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         updateASREngineMenuState()
-        updateLLMToggleTitle()
-    }
-
-    private func updateLLMToggleTitle() {
-        let enabled = llmRefiner.isEnabled
-        llmToggleItem.title = enabled ? "LLM 纠错已开启 ✓" : "LLM 纠错已关闭"
     }
 
     private func updateLanguageMenuState() {
@@ -343,17 +336,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateLanguageMenuState()
     }
 
-    @objc private func toggleLLM(_ sender: NSMenuItem) {
-        llmRefiner.isEnabled.toggle()
-        updateLLMToggleTitle()
-    }
-
     @objc private func openSettings(_ sender: NSMenuItem) {
         windowCoordinator.showSettings(tab: .asr)
     }
 
     @objc private func openWorkbench(_ sender: NSMenuItem) {
         windowCoordinator.showMainWindow()
+    }
+
+    @objc private func openGitHub(_ sender: NSMenuItem) {
+        guard let url = URL(string: "https://github.com/xingbofeng/VoiceInput") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: - ASR Engine Menu
@@ -364,7 +357,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         for engineType in ASREngineType.allCases {
             let item = NSMenuItem(
-                title: engineType.rawValue,
+                title: engineType.displayName,
                 action: #selector(selectASREngine(_:)),
                 keyEquivalent: ""
             )
@@ -512,7 +505,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Error Handling
 
     private func resolveRecordingPermissions() async {
-        // Qwen3-ASR only needs microphone, not Apple Speech
+        // Qwen3-ASR only needs microphone, not system speech recognition.
         let engineType = asrManager.effectiveSelectedEngineType
 
         if engineType == .qwen3 {
@@ -569,17 +562,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let speech = SpeechRecognizer.checkPermission()
         let accessibility = AXIsProcessTrusted()
         let engineType = asrManager.effectiveSelectedEngineType
+        let speechStatus = PermissionSummary.speechRecognitionStatus(
+            engineType: engineType,
+            speechPermission: speech
+        )
+        let speechGranted = engineType == .qwen3 || speech == .granted
 
         let alert = NSAlert()
-        alert.messageText = "权限状态"
-        alert.informativeText = """
-        辅助功能：\(PermissionSummary.statusText(accessibility))
-        麦克风：\(PermissionSummary.statusText(mic == .granted))
-        语音识别：\(PermissionSummary.speechRecognitionStatus(engineType: engineType, speechPermission: speech))
-        """
+        alert.messageText = "权限检查"
+        alert.informativeText = "确认 VoiceInput 录音、转写和文本输入所需权限。"
         alert.alertStyle = .informational
+        alert.accessoryView = NSHostingView(
+            rootView: PermissionStatusPanel(
+                items: [
+                    PermissionStatusItem(
+                        title: "辅助功能",
+                        subtitle: "监听快捷键并向当前应用输入转写文本",
+                        systemImage: "accessibility",
+                        status: PermissionSummary.statusText(accessibility),
+                        granted: accessibility
+                    ),
+                    PermissionStatusItem(
+                        title: "麦克风",
+                        subtitle: "录制你的声音用于听写",
+                        systemImage: "mic",
+                        status: PermissionSummary.statusText(mic == .granted),
+                        granted: mic == .granted
+                    ),
+                    PermissionStatusItem(
+                        title: "语音识别",
+                        subtitle: engineType == .qwen3 ? "当前 Qwen3-ASR 不需要系统语音识别权限" : "系统自带模型需要此权限",
+                        systemImage: "waveform",
+                        status: speechStatus,
+                        granted: speechGranted
+                    ),
+                ]
+            )
+        )
         alert.addButton(withTitle: "打开系统设置")
-        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "完成")
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.open(
                 URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy")!
@@ -650,5 +671,67 @@ extension AppDelegate: AudioRecorder.Delegate {
 
     func audioRecorder(_ recorder: AudioRecorder, didUpdateRMS rms: Float) {
         overlayController.updateRMS(rms)
+    }
+}
+
+private struct PermissionStatusItem: Identifiable {
+    let id = UUID()
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let status: String
+    let granted: Bool
+}
+
+private struct PermissionStatusPanel: View {
+    let items: [PermissionStatusItem]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(items) { item in
+                HStack(spacing: 12) {
+                    Image(systemName: item.systemImage)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(item.granted ? Color.green : Color.orange)
+                        .frame(width: 38, height: 38)
+                        .background((item.granted ? Color.green : Color.orange).opacity(0.11))
+                        .clipShape(Circle())
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(AppTheme.ColorToken.primaryText)
+                        Text(item.subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(AppTheme.ColorToken.secondaryText)
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Text(item.status)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(item.granted ? Color.green : Color.orange)
+                        .padding(.horizontal, 9)
+                        .frame(height: 26)
+                        .background((item.granted ? Color.green : Color.orange).opacity(0.1))
+                        .clipShape(Capsule())
+                }
+                .padding(12)
+                .background(AppTheme.ColorToken.panelBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(AppTheme.ColorToken.panelStroke)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+
+            Text("如果权限刚刚修改，请回到 VoiceInput 后重新检查。")
+                .font(.system(size: 11))
+                .foregroundStyle(AppTheme.ColorToken.secondaryText)
+                .padding(.top, 2)
+        }
+        .padding(.top, 4)
+        .frame(width: 420)
     }
 }

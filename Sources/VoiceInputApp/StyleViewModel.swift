@@ -173,6 +173,11 @@ final class StyleViewModel: ObservableObject {
         lastActionMessage = nil
     }
 
+    func clearFeedback() {
+        lastError = nil
+        lastActionMessage = nil
+    }
+
     private func requireProfile(id: String) throws -> StyleProfileRecord {
         if let profile = try environment.styleRepository.profile(id: id) {
             return profile

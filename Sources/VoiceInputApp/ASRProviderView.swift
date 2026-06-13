@@ -12,7 +12,7 @@ struct ASRProviderView: View {
             }
 
             if let error = viewModel.lastError {
-                ActionFeedbackView(message: nil, error: error)
+                ActionFeedbackView(message: nil, error: error, onDismiss: viewModel.clearFeedback)
             }
 
             tagBar

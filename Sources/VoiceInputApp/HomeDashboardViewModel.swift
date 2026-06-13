@@ -153,6 +153,11 @@ final class HomeDashboardViewModel: ObservableObject {
         selectedDetail = nil
     }
 
+    func clearFeedback() {
+        lastError = nil
+        lastActionMessage = nil
+    }
+
     func reprocessSelectedHistoryItem() async {
         guard let id = selectedDetail?.id else {
             return

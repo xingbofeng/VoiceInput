@@ -26,7 +26,7 @@ final class SettingsWindowController: NSWindowController {
 
     // MARK: - ASR Tab
 
-    private let appleRadio = NSButton(radioButtonWithTitle: "Apple Speech", target: nil, action: nil)
+    private let appleRadio = NSButton(radioButtonWithTitle: "系统自带", target: nil, action: nil)
     private let qwen3Radio = NSButton(radioButtonWithTitle: "Qwen3-ASR", target: nil, action: nil)
     private let modelPathField = NSTextField()
     private let downloadButton = NSButton()
@@ -193,7 +193,7 @@ final class SettingsWindowController: NSWindowController {
             engineLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: margin),
             engineLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: margin),
 
-            // Apple Speech radio
+        // System speech recognition radio
             appleRadio.topAnchor.constraint(equalTo: engineLabel.bottomAnchor, constant: 8),
             appleRadio.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: margin + 16),
 

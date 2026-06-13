@@ -248,6 +248,11 @@ final class NotesViewModel: ObservableObject {
         lastActionMessage = nil
     }
 
+    func clearFeedback() {
+        lastError = nil
+        lastActionMessage = nil
+    }
+
     private func configureTranscriber() {
         transcriber.onTranscription = { [weak self] text, isFinal in
             guard let self else { return }
