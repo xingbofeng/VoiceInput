@@ -746,6 +746,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Audio Feedback
 
+    @MainActor
     private enum FeedbackSound {
         static let start = NSSound(named: "Morse")
         static let complete = NSSound(named: "Glass")
